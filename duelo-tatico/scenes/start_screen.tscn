@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://ddq7f3501w1gm"]
+
+[ext_resource type="Script" uid="uid://dc33dx4jmjxkn" path="res://scenes/start_screen.gd" id="1_tx5wa"]
+
+[node name="StartScreen" type="Control" unique_id=1246033750]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_tx5wa")
+
+[node name="ColorRect" type="ColorRect" parent="." unique_id=94476819]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.11764706, 0.11764706, 0.18039216, 1)
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1380454142]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer" unique_id=840500942]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1473221877]
+layout_mode = 2
+theme_override_font_sizes/font_size = 42
+text = "⚽ Duelo Tático"
+horizontal_alignment = 1
+
+[node name="SubtitleLabel" type="Label" parent="CenterContainer/VBoxContainer" unique_id=1119393856]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.827451, 0.827451, 0.827451, 1)
+theme_override_font_sizes/font_size = 18
+text = "Escolha um modo de jogo"
+horizontal_alignment = 1
+
+[node name="CampaignButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=1068190025]
+layout_mode = 2
+theme_override_colors/font_disabled_color = Color(0.627451, 0.627451, 0.627451, 1)
+theme_override_constants/h_separation = 20
+text = "Modo Campanha"
+
+[node name="ChallengeButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=2108403847]
+layout_mode = 2
+theme_override_constants/h_separation = 20
+text = "Modo Desafio"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/VBoxContainer" unique_id=460015165]
+layout_mode = 2
+theme_override_constants/h_separation = 20
+text = "Sair
+"

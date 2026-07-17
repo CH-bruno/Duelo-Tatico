@@ -1,0 +1,81 @@
+[gd_scene format=3 uid="uid://c2kjxwjelblgt"]
+
+[ext_resource type="Script" uid="uid://sewumxxu8r0" path="res://scenes/campaign_menu.gd" id="1_ed861"]
+
+[node name="CampaignMenu" type="Control" unique_id=638279294]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ed861")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2067691132]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TitleLabel" type="Label" parent="VBoxContainer" unique_id=327309213]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Duelo Tático
+"
+horizontal_alignment = 1
+
+[node name="StageLabel" type="Label" parent="VBoxContainer" unique_id=1868470638]
+layout_mode = 2
+text = "Fase 1/5
+"
+horizontal_alignment = 1
+
+[node name="EnemyLabel" type="Label" parent="VBoxContainer" unique_id=1513938469]
+layout_mode = 2
+text = "Adversário"
+horizontal_alignment = 1
+
+[node name="StageDotsLabel" type="Label" parent="VBoxContainer" unique_id=1289299113]
+layout_mode = 2
+
+[node name="SquadSummaryLabel" type="Label" parent="VBoxContainer" unique_id=2038236168]
+layout_mode = 2
+
+[node name="HSeparator" type="HSeparator" parent="VBoxContainer" unique_id=1831991152]
+layout_mode = 2
+
+[node name="LineupButton" type="Button" parent="VBoxContainer" unique_id=800599170]
+layout_mode = 2
+text = "Escalar Time"
+
+[node name="LineupPanel" type="VBoxContainer" parent="VBoxContainer" unique_id=1381811535]
+layout_mode = 2
+
+[node name="ZagOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=952195734]
+layout_mode = 2
+
+[node name="VolOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=600714918]
+layout_mode = 2
+
+[node name="MeiOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=1608036145]
+layout_mode = 2
+
+[node name="CaOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=439059892]
+layout_mode = 2
+
+[node name="ConfirmLineupButton" type="Button" parent="VBoxContainer/LineupPanel" unique_id=1393060519]
+layout_mode = 2
+text = "Confirmar Escalação"
+
+[node name="StartMatchButton" type="Button" parent="VBoxContainer" unique_id=822824562]
+layout_mode = 2
+text = "Começar Partida"
+
+[node name="HintLabel" type="Label" parent="VBoxContainer" unique_id=1401107458]
+layout_mode = 2
+
+[node name="BackButton" type="Button" parent="VBoxContainer" unique_id=2002032957]
+layout_mode = 2
+text = "Voltar"
