@@ -132,6 +132,8 @@ enum Possession {
 }
 
 var possession = Possession.PLAYER
+var ai_zone = 1
+
 func _ready():
 	_apply_lineup()
 	push_log("Apito inicial. A bola está com o %s." % active_player()["name"])
@@ -447,8 +449,40 @@ func player_gets_ball() -> void:
 
 func ai_gets_ball() -> void:
 	possession = Possession.AI
+	ai_zone = 1
 	streak = 0
 	momentum_bonus = 0
+	
+func ai_play_turn() -> void:
+
+	if possession != Possession.AI:
+		return
+
+	if ai_zone < 3:
+
+		var advance = randi_range(1,100) <= 70
+
+		if advance:
+
+			ai_zone += 1
+
+			push_log("O adversário avançou para %s." % ZONES[ai_zone])
+
+		else:
+
+			push_log("O adversário errou o ataque.")
+
+			recover_possession()
+
+			state_changed.emit()
+
+			return
+
+	else:
+
+		_resolve_ai_shot()
+
+	state_changed.emit()
 	
 func _advance_round() -> void:
 	round_num += 1
@@ -466,15 +500,9 @@ func _advance_round() -> void:
 			push_log("Sua campanha terminou. Clique em 'Novo Jogo' para recomeçar.")
 
 
-func ai_turn() -> void:
-	var breakaway_chance = 25
+func ai_turn():
 
-	if randi_range(1, 100) > breakaway_chance:
-		recover_possession()
-		return
-
-	_resolve_ai_shot()
-
+	ai_play_turn()
 
 func _resolve_ai_shot() -> void:
 	var attack = ai_attack_strength()
@@ -505,6 +533,8 @@ func _resolve_ai_shot() -> void:
 		])
 
 		recover_possession()
+		
+	player_gets_ball()
 
 
 func grant_xp(amount: int) -> void:
