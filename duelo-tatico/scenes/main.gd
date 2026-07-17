@@ -18,6 +18,10 @@ extends Control
 @onready var next_match: Button = $VBoxContainer/NextMatchButton
 @onready var menu_button: Button = $VBoxContainer/MenuButton
 @onready var goal_flash: ColorRect = $GoalFlash
+@onready var defense_container = $VBoxContainer/DefenseContainer
+@onready var press_button = $VBoxContainer/DefenseContainer/PressButton
+@onready var mark_button = $VBoxContainer/DefenseContainer/MarkButton
+@onready var retreat_button = $VBoxContainer/DefenseContainer/RetreatButton
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
@@ -58,7 +62,7 @@ func refresh_ui():
 	if GameState.possession == GameState.Possession.PLAYER:
 		zone_name = GameState.ZONES[GameState.zone_idx]
 	else:
-		zone_name = "Ataque IA - %s" % GameState.ZONES[GameState.ai_zone]
+		zone_name = "Ataque IA - %s" % GameState.ZONES[GameState.ai_zone_idx]
 
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		zone_label.text = "Rodada %d/%d | Fase %d/%d | Zona: %s | Você %d × %d Adversário" % [

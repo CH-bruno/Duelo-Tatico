@@ -60,9 +60,6 @@ layout_mode = 2
 [node name="DefBar" type="ProgressBar" parent="VBoxContainer" unique_id=1801232611]
 layout_mode = 2
 
-[node name="PassContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1141677544]
-layout_mode = 2
-
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=190161904]
 layout_mode = 2
 size_flags_vertical = 3
@@ -82,6 +79,24 @@ size_flags_horizontal = 3
 [node name="LongShotButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1157374108]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="PassContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1141677544]
+layout_mode = 2
+
+[node name="DefenseContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1798104210]
+layout_mode = 2
+
+[node name="PressButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=598992495]
+layout_mode = 2
+text = "Pressionar"
+
+[node name="MarkButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=494047326]
+layout_mode = 2
+text = "Marcação"
+
+[node name="RetreatButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=1491687951]
+layout_mode = 2
+text = "Recuar"
 
 [node name="LogLabel" type="Label" parent="VBoxContainer" unique_id=1688800370]
 layout_mode = 2

@@ -131,11 +131,17 @@ enum Possession {
 	PLAYER,
 	AI
 }
-
 var possession = Possession.PLAYER
 
-var ai_zone_idx = 3
-var ai_active_idx = 3
+enum TurnState {
+	PLAYER_ATTACK,
+	PLAYER_DEFENSE
+}
+var turn_state = TurnState.PLAYER_ATTACK
+
+var ai_zone_idx = 0
+var ai_active_idx = 0
+var ai_momentum = 0
 
 func _ready():
 	_apply_lineup()
@@ -180,6 +186,7 @@ func active_player() -> Dictionary:
 
 func player_gets_ball() -> void:
 	possession = Possession.PLAYER
+	turn_state = TurnState.PLAYER_ATTACK
 
 	zone_idx = 0
 	active_idx = 0
@@ -190,20 +197,17 @@ func player_gets_ball() -> void:
 
 	streak = 0
 	momentum_bonus = 0
-	possession = Possession.PLAYER
-	zone_idx = 0
-	active_idx = 0
-	streak = 0
-	momentum_bonus = 0
 	
 func ai_active_player_zone() -> int:
 	return ai_zone_idx
 	
 func ai_gets_ball() -> void:
 	possession = Possession.AI
-	ai_zone = 1
-	streak = 0
-	momentum_bonus = 0
+	turn_state = TurnState.PLAYER_DEFENSE
+
+	ai_zone_idx = 0
+
+	push_log("O adversário iniciou o ataque.")
 	
 func trait_name(trait_id: String) -> String:
 	match trait_id:
@@ -477,15 +481,15 @@ func ai_play_turn() -> void:
 	if possession != Possession.AI:
 		return
 
-	if ai_zone < 3:
+	if ai_zone_idx < 3:
 
 		var advance = randi_range(1,100) <= 70
 
 		if advance:
 
-			ai_zone += 1
+			ai_zone_idx += 1
 
-			push_log("O adversário avançou para %s." % ZONES[ai_zone])
+			push_log("O adversário avançou para %s." % ZONES[ai_zone_idx])
 
 		else:
 
@@ -519,12 +523,12 @@ func _advance_round() -> void:
 			push_log("Sua campanha terminou. Clique em 'Novo Jogo' para recomeçar.")
 
 
-func ai_turn() -> void:
+func ai_turn():
+
 	if possession != Possession.AI:
 		return
 
-	while possession == Possession.AI and not match_over:
-		_ai_play()
+	push_log("Escolha sua ação defensiva.")
 		
 func _ai_play() -> void:
 
@@ -668,12 +672,70 @@ func _reset_possession(reason: String) -> void:
 
 	ai_turn()
 
+func defend(action:String):
+
+	if turn_state != TurnState.PLAYER_DEFENSE:
+		return
+
+	match action:
+
+		"PRESS":
+			_ai_resolve_attack(65,15,-10)
+
+		"MARK":
+			_ai_resolve_attack(45,0,0)
+
+		"RETREAT":
+			_ai_resolve_attack(25,-10,20)
+
+	state_changed.emit()
+	
+func ai_pass_chance() -> int:
+	return clampi(80 - ai_zone_idx * 8, 30, 90)
+	
+func _ai_resolve_attack(recover_bonus:int,pass_penalty:int,shot_penalty:int):
+
+	if randi_range(1,100) <= recover_bonus:
+
+		push_log("Seu time recuperou a posse!")
+
+		recover_possession()
+
+		return
+
+	if ai_zone_idx < 3:
+		var chance = clampi(ai_pass_chance() + pass_penalty,10,95)
+
+		if randi_range(1,100) <= chance:
+
+			ai_zone_idx += 1
+
+			push_log("O adversário avançou.")
+
+		else:
+
+			push_log("Passe errado do adversário.")
+
+			recover_possession()
+
+	else:
+
+		var chance = clampi(ai_attack_strength()+shot_penalty,10,95)
+
+		if randi_range(1,100) <= chance:
+
+			_resolve_ai_shot()
+
+		else:
+
+			push_log("O adversário desperdiçou a chance.")
+
+			recover_possession()
 
 func push_log(text: String) -> void:
 	log_messages.push_front(text)
 	if log_messages.size() > 6:
 		log_messages.resize(6)
-
 
 func next_match() -> void:
 	if not match_over or goals <= ai_goals:
@@ -694,7 +756,6 @@ func next_match() -> void:
 	push_log("A bola está com o %s." % active_player()["name"])
 	SFX.play_whistle()
 	state_changed.emit()
-
 
 func next_challenge_round() -> void:
 	# Sem teto: continua enquanto você vencer. Quebra a sequência só na derrota/empate.
@@ -717,7 +778,6 @@ func next_challenge_round() -> void:
 	push_log("Sobrevivência: %d vitória(s) seguida(s)! O adversário fica mais forte." % challenge_wins)
 	SFX.play_whistle()
 	state_changed.emit()
-
 
 func reset_game() -> void:
 	level = 1
