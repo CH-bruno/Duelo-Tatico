@@ -126,6 +126,12 @@ enum GameMode {
 }
 var game_mode = GameMode.CAMPAIGN
 
+enum Possession {
+	PLAYER,
+	AI
+}
+
+var possession = Possession.PLAYER
 func _ready():
 	_apply_lineup()
 	push_log("Apito inicial. A bola está com o %s." % active_player()["name"])
@@ -286,6 +292,9 @@ func attempt(action: String, target_idx: int = -1) -> void:
 	if match_over:
 		return
 
+	if possession != Possession.PLAYER:
+		return
+
 	var passer_name = active_player()["name"]
 	var target_name = ""
 
@@ -420,17 +429,27 @@ func recover_possession() -> void:
 		zone_idx = 1
 		active_idx = 1
 		push_log(Narration.VOL_RECOVERY.pick_random() % [squad[1]["name"]])
-
+		
+	possession = Possession.PLAYER
 	streak = 0
 
 
 func _kickoff():
+	player_gets_ball()
+
+func player_gets_ball() -> void:
+	possession = Possession.PLAYER
 	zone_idx = 0
 	active_idx = 0
 	streak = 0
 	momentum_bonus = 0
 
 
+func ai_gets_ball() -> void:
+	possession = Possession.AI
+	streak = 0
+	momentum_bonus = 0
+	
 func _advance_round() -> void:
 	round_num += 1
 	if round_num >= MAX_ROUNDS:
@@ -524,10 +543,14 @@ func grant_xp(amount: int) -> void:
 
 
 func _reset_possession(reason: String) -> void:
-	_kickoff()
 	turnovers += 1
+
 	push_log(reason)
+
 	SFX.play_turnover()
+
+	ai_gets_ball()
+
 	ai_turn()
 
 
@@ -543,7 +566,7 @@ func next_match() -> void:
 
 	campaign_stage += 1
 	log_messages.clear()
-
+	possession = Possession.PLAYER
 	_kickoff()
 	goals = 0
 	ai_goals = 0
@@ -566,6 +589,7 @@ func next_challenge_round() -> void:
 	challenge_wins += 1
 	challenge_best = max(challenge_best, challenge_wins)
 	log_messages.clear()
+	possession = Possession.PLAYER
 
 	_kickoff()
 	goals = 0
@@ -586,6 +610,7 @@ func reset_game() -> void:
 	xp_to_next = 20
 	starters = [0, 2, 4, 6]
 	_apply_lineup()
+	possession = Possession.PLAYER
 	_kickoff()
 	goals = 0
 	ai_goals = 0
