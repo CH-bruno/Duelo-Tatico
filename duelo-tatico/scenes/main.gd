@@ -41,6 +41,9 @@ func _ready():
 	next_match.pressed.connect(_on_next_match_pressed)
 	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
 	menu_button.theme_type_variation = "GhostButton"
+	press_button.pressed.connect(func():GameState.defend("PRESS"))
+	mark_button.pressed.connect(func():GameState.defend("MARK"))
+	retreat_button.pressed.connect(func():GameState.defend("RETREAT"))
 
 	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button]:
 		_add_press_feedback(btn)
@@ -118,7 +121,15 @@ func refresh_ui():
 		_flash_goal(Color(0.9, 0.3, 0.3, 1))  # vermelho — gol do adversário
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
+	var attacking = GameState.turn_state == GameState.TurnState.PLAYER_ATTACK
 
+	dri_button.visible = attacking
+	sho_button.visible = attacking
+	feint_button.visible = attacking
+	long_shot_button.visible = attacking
+	pass_container.visible = attacking
+
+	defense_container.visible = !attacking
 
 func _rebuild_pass_buttons():
 	for child in pass_container.get_children():
