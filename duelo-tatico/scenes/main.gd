@@ -53,7 +53,12 @@ func _ready():
 
 func refresh_ui():
 	var p = GameState.active_player()
-	var zone_name = GameState.ZONES[GameState.zone_idx]
+	var zone_name = ""
+
+	if GameState.possession == GameState.Possession.PLAYER:
+		zone_name = GameState.ZONES[GameState.zone_idx]
+	else:
+		zone_name = "Ataque IA - %s" % GameState.ZONES[GameState.ai_zone]
 
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		zone_label.text = "Rodada %d/%d | Fase %d/%d | Zona: %s | Você %d × %d Adversário" % [
