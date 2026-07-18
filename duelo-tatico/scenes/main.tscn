@@ -85,7 +85,6 @@ layout_mode = 2
 
 [node name="DefenseContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1798104210]
 layout_mode = 2
-size_flags_vertical = 3
 
 [node name="PressButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=598992495]
 layout_mode = 2
