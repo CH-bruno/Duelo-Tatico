@@ -494,7 +494,21 @@ func ai_turn():
 
 	turn_state = TurnState.PLAYER_DEFENSE
 
-	push_log("O adversário prepara a próxima jogada.")
+	_choose_ai_move()
+
+	match ai_next_move:
+
+		AIMove.PASS:
+			push_log("O adversário procura um companheiro para o passe.")
+
+		AIMove.DRIBBLE:
+			push_log("O atacante parte para o drible!")
+
+		AIMove.LONG_SHOT:
+			push_log("O adversário prepara um chute de longe!")
+
+		AIMove.SHOT:
+			push_log("O atacante ficou cara a cara com o gol!")
 
 	state_changed.emit()
 		
@@ -660,20 +674,14 @@ func _ai_resolve_attack(recover_bonus:int, pass_penalty:int, shot_penalty:int):
 
 		AIMove.PASS:
 
-			if randi_range(1,100) <= recover_bonus:
-				push_log("Você interceptou o passe!")
-				recover_possession()
-				return
-
 			var chance = clampi(ai_pass_chance() + pass_penalty,10,95)
 
 			if randi_range(1,100) <= chance:
 				ai_zone_idx += 1
-				push_log("Passe certo do adversário.")
+				push_log("O passe do adversário foi completo.")
 			else:
-				push_log("Passe errado.")
+				push_log("O passe saiu errado!")
 				recover_possession()
-
 
 		AIMove.DRIBBLE:
 
@@ -683,35 +691,27 @@ func _ai_resolve_attack(recover_bonus:int, pass_penalty:int, shot_penalty:int):
 				95
 			)
 
-			if randi_range(1,100) <= recover_bonus:
-				push_log("Você roubou a bola!")
-				recover_possession()
-				return
-
 			if randi_range(1,100) <= chance:
 				ai_zone_idx += 1
 				push_log("O atacante passou pela marcação.")
 			else:
-				push_log("O drible falhou.")
+				push_log("Você desarmou o adversário!")
 				recover_possession()
-
 
 		AIMove.LONG_SHOT:
 
 			var chance = clampi(
 				18 + difficulty_stage()*3 + shot_penalty,
 				5,
-				60
+				80
 			)
 
 			if randi_range(1,100) <= chance:
-				ai_goals += 1
-				push_log("Golaço de longe!")
-				_kickoff()
+				push_log("O chute de longe foi perigoso!")
+				_resolve_ai_shot()
 			else:
-				push_log("O chute saiu para fora.")
+				push_log("O chute saiu longe do gol.")
 				recover_possession()
-
 
 		AIMove.SHOT:
 
