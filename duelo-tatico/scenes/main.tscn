@@ -86,17 +86,17 @@ layout_mode = 2
 [node name="DefenseContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1798104210]
 layout_mode = 2
 
-[node name="PressButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=598992495]
+[node name="InterceptButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=598992495]
 layout_mode = 2
-text = "Pressionar"
+text = "Interceptação"
 
-[node name="MarkButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=494047326]
+[node name="TackleButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=494047326]
 layout_mode = 2
-text = "Marcação"
+text = "Desarme"
 
-[node name="RetreatButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=1491687951]
+[node name="CoverButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=1491687951]
 layout_mode = 2
-text = "Recuar"
+text = "Cobertura"
 
 [node name="LogLabel" type="Label" parent="VBoxContainer" unique_id=1688800370]
 layout_mode = 2
