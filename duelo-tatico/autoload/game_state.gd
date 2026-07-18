@@ -139,6 +139,14 @@ enum TurnState {
 }
 var turn_state = TurnState.PLAYER_ATTACK
 
+enum AIMove {
+	PASS,
+	DRIBBLE,
+	LONG_SHOT,
+	SHOT
+}
+var ai_next_move = AIMove.PASS
+
 var ai_zone_idx = 0
 var ai_active_idx = 0
 var ai_momentum = 0
@@ -158,14 +166,12 @@ func candidates_for(role_idx: int) -> Array:
 			result.append(i)
 	return result
 
-
 func set_lineup(new_starters: Array) -> void:
 	if new_starters.size() != ROLES.size():
 		return
 	starters = new_starters.duplicate()
 	_apply_lineup()
 	state_changed.emit()
-
 
 func _apply_lineup() -> void:
 	# Monta o squad a partir do roster, aplicando o crescimento por nível
@@ -180,7 +186,6 @@ func _apply_lineup() -> void:
 		p["DEF"] = min(95, p["DEF"] + 2 * growth_levels)
 		squad.append(p)
 
-
 func active_player() -> Dictionary:
 	return squad[active_idx]
 
@@ -194,20 +199,10 @@ func player_gets_ball() -> void:
 	# Reinicia o ataque da IA
 	ai_zone_idx = 0
 	ai_active_idx = 0
-
+	ai_momentum = 0
+	
 	streak = 0
 	momentum_bonus = 0
-	
-func ai_active_player_zone() -> int:
-	return ai_zone_idx
-	
-func ai_gets_ball() -> void:
-	possession = Possession.AI
-	turn_state = TurnState.PLAYER_DEFENSE
-
-	ai_zone_idx = 0
-
-	push_log("O adversário iniciou o ataque.")
 	
 func trait_name(trait_id: String) -> String:
 	match trait_id:
@@ -229,7 +224,6 @@ func trait_name(trait_id: String) -> String:
 			return "Atirador (+Chute de Longe)"
 		_:
 			return trait_id
-
 
 func trait_bonus(action: String) -> int:
 	var player_trait = active_player()["trait"]
@@ -253,26 +247,21 @@ func trait_bonus(action: String) -> int:
 
 	return 0
 
-
 func difficulty_stage() -> int:
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		return challenge_wins + 1
 	return campaign_stage
-
 
 func opponent_difficulty_for(zone: int) -> int:
 	var base_by_zone = [25, 35, 45, 55]
 	var value = base_by_zone[zone] + int(level * 1.0) + (difficulty_stage() - 1) * 4
 	return min(92, value)
 
-
 func opponent_difficulty() -> int:
 	return opponent_difficulty_for(zone_idx)
 
-
 func ai_attack_strength() -> int:
 	return min(88, 25 + int(level * 0.8) + (difficulty_stage() - 1) * 3)
-
 
 func chance_for(stat_name: String) -> int:
 	var diff = active_player()[stat_name] - opponent_difficulty() + momentum_bonus
@@ -285,7 +274,6 @@ func chance_for(stat_name: String) -> int:
 	var pct = 50 + diff * 0.6
 	return clampi(round(pct), 8, 92)
 
-
 func feint_chance() -> int:
 	# Finta: mistura Drible e Chute (habilidade + confiança pra ir pra cima do marcador).
 	# Base mais dura que o drible normal, mas o prêmio (momentum) é bem maior.
@@ -295,14 +283,12 @@ func feint_chance() -> int:
 	var pct = 50 + diff * 0.6
 	return clampi(round(pct), 5, 90)
 
-
 func long_shot_chance() -> int:
 	# Chute de longe: só faz sentido na Terço Final, com penalidade fixa pela distância do gol.
 	var diff = active_player()["SHO"] - opponent_difficulty() - 20 + momentum_bonus
 	diff += trait_bonus("LONG_SHO")
 	var pct = 50 + diff * 0.6
 	return clampi(round(pct), 5, 85)
-
 
 func pass_chance_to(target_idx: int) -> int:
 	var distance = abs(target_idx - zone_idx)
@@ -321,7 +307,6 @@ func pass_chance_to(target_idx: int) -> int:
 
 	var pct = 50 + diff * 0.6
 	return clampi(round(pct), 8, 92)
-
 
 func attempt(action: String, target_idx: int = -1) -> void:
 	if match_over:
@@ -440,7 +425,6 @@ func attempt(action: String, target_idx: int = -1) -> void:
 	_advance_round()
 	state_changed.emit()
 
-
 func recover_possession() -> void:
 	
 	player_gets_ball()
@@ -471,42 +455,9 @@ func recover_possession() -> void:
 	possession = Possession.PLAYER
 	streak = 0
 
-
 func _kickoff():
 	player_gets_ball()
 
-
-func ai_play_turn() -> void:
-
-	if possession != Possession.AI:
-		return
-
-	if ai_zone_idx < 3:
-
-		var advance = randi_range(1,100) <= 70
-
-		if advance:
-
-			ai_zone_idx += 1
-
-			push_log("O adversário avançou para %s." % ZONES[ai_zone_idx])
-
-		else:
-
-			push_log("O adversário errou o ataque.")
-
-			recover_possession()
-
-			state_changed.emit()
-
-			return
-
-	else:
-
-		_resolve_ai_shot()
-
-	state_changed.emit()
-	
 func _advance_round() -> void:
 	round_num += 1
 	if round_num >= MAX_ROUNDS:
@@ -522,42 +473,54 @@ func _advance_round() -> void:
 			push_log("Empate em %d × %d." % [goals, ai_goals])
 			push_log("Sua campanha terminou. Clique em 'Novo Jogo' para recomeçar.")
 
+func ai_active_player_zone() -> int:
+	return ai_zone_idx
+	
+func ai_gets_ball() -> void:
+	
+	possession = Possession.AI
+	turn_state = TurnState.PLAYER_DEFENSE
 
+	ai_zone_idx = 0
+	ai_active_idx = 0
+	ai_momentum = 0
+	
+	push_log("O adversário iniciou o ataque.")
+	
 func ai_turn():
 
 	if possession != Possession.AI:
 		return
 
-	push_log("Escolha sua ação defensiva.")
+	turn_state = TurnState.PLAYER_DEFENSE
+
+	push_log("O adversário prepara a próxima jogada.")
+
+	state_changed.emit()
 		
-func _ai_play() -> void:
+func _choose_ai_move():	
 
 	match ai_zone_idx:
 
 		0:
-			_ai_pass()
+			ai_next_move = AIMove.PASS
 
 		1:
-			if randi_range(1,100) <= 70:
-				_ai_pass()
-			else:
-				_ai_dribble()
+			ai_next_move = AIMove.PASS if randi()%100 < 70 else AIMove.DRIBBLE
 
 		2:
-			var roll = randi_range(1,100)
+			var r = randi()%100
 
-			if roll <= 40:
-				_ai_pass()
-
-			elif roll <= 80:
-				_ai_dribble()
-
+			if r < 40:
+				ai_next_move = AIMove.PASS
+			elif r < 80:
+				ai_next_move = AIMove.DRIBBLE
 			else:
-				_ai_long_shot()
+				ai_next_move = AIMove.LONG_SHOT
 
 		3:
-			_ai_shoot()
-			
+			ai_next_move = AIMove.SHOT
+
 func _ai_pass() -> void:
 	var chance = clampi(80 - ai_zone_idx * 8, 30, 90)
 
@@ -623,9 +586,6 @@ func _resolve_ai_shot() -> void:
 
 		recover_possession()
 		
-	player_gets_ball()
-
-
 func grant_xp(amount: int) -> void:
 	xp += amount
 	while xp >= xp_to_next:
@@ -660,7 +620,6 @@ func grant_xp(amount: int) -> void:
 					player["SHO"] = min(95, player["SHO"] + 3)
 					player["DEF"] = min(95, player["DEF"] + 1)
 
-
 func _reset_possession(reason: String) -> void:
 	turnovers += 1
 
@@ -693,44 +652,70 @@ func defend(action:String):
 func ai_pass_chance() -> int:
 	return clampi(80 - ai_zone_idx * 8, 30, 90)
 	
-func _ai_resolve_attack(recover_bonus:int,pass_penalty:int,shot_penalty:int):
+func _ai_resolve_attack(recover_bonus:int, pass_penalty:int, shot_penalty:int):
 
-	if randi_range(1,100) <= recover_bonus:
+	_choose_ai_move()
 
-		push_log("Seu time recuperou a posse!")
+	match ai_next_move:
 
-		recover_possession()
+		AIMove.PASS:
 
-		return
+			if randi_range(1,100) <= recover_bonus:
+				push_log("Você interceptou o passe!")
+				recover_possession()
+				return
 
-	if ai_zone_idx < 3:
-		var chance = clampi(ai_pass_chance() + pass_penalty,10,95)
+			var chance = clampi(ai_pass_chance() + pass_penalty,10,95)
 
-		if randi_range(1,100) <= chance:
+			if randi_range(1,100) <= chance:
+				ai_zone_idx += 1
+				push_log("Passe certo do adversário.")
+			else:
+				push_log("Passe errado.")
+				recover_possession()
 
-			ai_zone_idx += 1
 
-			push_log("O adversário avançou.")
+		AIMove.DRIBBLE:
 
-		else:
+			var chance = clampi(
+				65 - ai_zone_idx * 4 + difficulty_stage()*2 + pass_penalty,
+				10,
+				95
+			)
 
-			push_log("Passe errado do adversário.")
+			if randi_range(1,100) <= recover_bonus:
+				push_log("Você roubou a bola!")
+				recover_possession()
+				return
 
-			recover_possession()
+			if randi_range(1,100) <= chance:
+				ai_zone_idx += 1
+				push_log("O atacante passou pela marcação.")
+			else:
+				push_log("O drible falhou.")
+				recover_possession()
 
-	else:
 
-		var chance = clampi(ai_attack_strength()+shot_penalty,10,95)
+		AIMove.LONG_SHOT:
 
-		if randi_range(1,100) <= chance:
+			var chance = clampi(
+				18 + difficulty_stage()*3 + shot_penalty,
+				5,
+				60
+			)
+
+			if randi_range(1,100) <= chance:
+				ai_goals += 1
+				push_log("Golaço de longe!")
+				_kickoff()
+			else:
+				push_log("O chute saiu para fora.")
+				recover_possession()
+
+
+		AIMove.SHOT:
 
 			_resolve_ai_shot()
-
-		else:
-
-			push_log("O adversário desperdiçou a chance.")
-
-			recover_possession()
 
 func push_log(text: String) -> void:
 	log_messages.push_front(text)
