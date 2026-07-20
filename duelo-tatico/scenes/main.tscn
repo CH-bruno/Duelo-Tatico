@@ -48,40 +48,43 @@ script = ExtResource("2_0wfyh")
 [node name="StatsLabel" type="Label" parent="VBoxContainer" unique_id=774211033]
 layout_mode = 2
 
-[node name="PasBar" type="ProgressBar" parent="VBoxContainer" unique_id=2094850916]
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=190161904]
 layout_mode = 2
 
-[node name="DriBar" type="ProgressBar" parent="VBoxContainer" unique_id=219747478]
+[node name="DriButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=133721324]
 layout_mode = 2
+text = "Drible"
 
-[node name="ShoBar" type="ProgressBar" parent="VBoxContainer" unique_id=1818670936]
+[node name="ShoButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1406994525]
 layout_mode = 2
+text = "Chute"
 
-[node name="DefBar" type="ProgressBar" parent="VBoxContainer" unique_id=1801232611]
+[node name="FeintButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1164373502]
 layout_mode = 2
+text = "Finta"
+
+[node name="LongShotButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1157374108]
+layout_mode = 2
+text = "Chute de longe"
 
 [node name="PassContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1141677544]
 layout_mode = 2
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=190161904]
+[node name="DefenseContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1798104210]
 layout_mode = 2
-size_flags_vertical = 3
 
-[node name="DriButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=133721324]
+[node name="InterceptButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=598992495]
 layout_mode = 2
-size_flags_horizontal = 3
+text = "Interceptação"
 
-[node name="ShoButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1406994525]
+[node name="TackleButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=494047326]
 layout_mode = 2
-size_flags_horizontal = 3
+text = "Desarme"
 
-[node name="FeintButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1164373502]
+[node name="BlockButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=1491687951]
 layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="LongShotButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1157374108]
-layout_mode = 2
-size_flags_horizontal = 3
+text = "Bloquear
+"
 
 [node name="LogLabel" type="Label" parent="VBoxContainer" unique_id=1688800370]
 layout_mode = 2

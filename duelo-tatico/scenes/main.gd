@@ -10,14 +10,15 @@ extends Control
 @onready var feint_button: Button = $VBoxContainer/HBoxContainer/FeintButton
 @onready var sho_button: Button = $VBoxContainer/HBoxContainer/ShoButton
 @onready var long_shot_button: Button = $VBoxContainer/HBoxContainer/LongShotButton
-@onready var pas_bar: ProgressBar = $VBoxContainer/PasBar
-@onready var dri_bar: ProgressBar = $VBoxContainer/DriBar
-@onready var sho_bar: ProgressBar = $VBoxContainer/ShoBar
-@onready var def_bar: ProgressBar = $VBoxContainer/DefBar
 @onready var reset_button: Button = $VBoxContainer/ResetButton
 @onready var next_match: Button = $VBoxContainer/NextMatchButton
 @onready var menu_button: Button = $VBoxContainer/MenuButton
 @onready var goal_flash: ColorRect = $GoalFlash
+@onready var defense_container: HBoxContainer = $VBoxContainer/DefenseContainer
+@onready var intercept_button: Button = $VBoxContainer/DefenseContainer/InterceptButton
+@onready var tackle_button: Button = $VBoxContainer/DefenseContainer/TackleButton
+@onready var block_button: Button = $VBoxContainer/DefenseContainer/BlockButton
+@onready var attack_container: HBoxContainer = $VBoxContainer/HBoxContainer
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
@@ -38,7 +39,11 @@ func _ready():
 	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
 	menu_button.theme_type_variation = "GhostButton"
 
-	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button]:
+	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
+	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
+	block_button.pressed.connect(func(): GameState.defend("BLOCK"))
+
+	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button, intercept_button, tackle_button, block_button]:
 		_add_press_feedback(btn)
 
 	goal_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -64,14 +69,27 @@ func refresh_ui():
 			GameState.challenge_wins, GameState.challenge_best, GameState.round_num, GameState.MAX_ROUNDS, zone_name, GameState.goals, GameState.ai_goals
 		]
 
-	stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  DEF %d   |   Nível %d   XP %d/%d" % [
-		p["name"], p["role"], p["PAS"], p["DRI"], p["SHO"], p["DEF"], GameState.level, GameState.xp, GameState.xp_to_next
+	stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  INT %d  TAC %d  BLQ %d   |   Nível %d   XP %d/%d" % [
+		p["name"], p["role"], p["PAS"], p["DRI"], p["SHO"], p["INT"], p["TAC"], p["BLQ"], GameState.level, GameState.xp, GameState.xp_to_next
 	]
 
-	_animate_bar(pas_bar, p["PAS"])
-	_animate_bar(dri_bar, p["DRI"])
-	_animate_bar(sho_bar, p["SHO"])
-	_animate_bar(def_bar, p["DEF"])
+	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
+	attack_container.visible = not is_defending
+	pass_container.visible = not is_defending
+	defense_container.visible = is_defending
+
+	if is_defending:
+		var int_chance = GameState.defense_chance("INTERCEPT")
+		var tac_chance = GameState.defense_chance("TACKLE")
+		var blq_chance = GameState.defense_chance("BLOCK")
+
+		intercept_button.text = "Interceptação (%d%%)" % int_chance
+		tackle_button.text = "Desarme (%d%%)" % tac_chance
+		block_button.text = "Bloqueio (%d%%)" % blq_chance
+
+		intercept_button.modulate = color_for_chance(int_chance)
+		tackle_button.modulate = color_for_chance(tac_chance)
+		block_button.modulate = color_for_chance(blq_chance)
 
 	var in_box = GameState.zone_idx == GameState.ZONES.size() - 1
 	var in_final_third = GameState.zone_idx == 2
@@ -135,12 +153,6 @@ func _rebuild_pass_buttons():
 func color_for_chance(chance_pct: int) -> Color:
 	var t = clampf(chance_pct / 100.0, 0.0, 1.0)
 	return Color(1.0, 0.3, 0.3).lerp(Color(0.4, 1.0, 0.4), t)
-
-
-func _animate_bar(bar: ProgressBar, new_value: float) -> void:
-	# Anima o valor da barra suavemente, em vez de pular direto pro número novo.
-	var tween = create_tween()
-	tween.tween_property(bar, "value", new_value, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 func _flash_goal(color: Color) -> void:
