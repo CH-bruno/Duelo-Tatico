@@ -19,9 +19,9 @@ extends Control
 @onready var menu_button: Button = $VBoxContainer/MenuButton
 @onready var goal_flash: ColorRect = $GoalFlash
 @onready var defense_container = $VBoxContainer/DefenseContainer
-@onready var press_button = $VBoxContainer/DefenseContainer/PressButton
-@onready var mark_button = $VBoxContainer/DefenseContainer/MarkButton
-@onready var retreat_button = $VBoxContainer/DefenseContainer/RetreatButton
+@onready var intercept_button = $VBoxContainer/DefenseContainer/InterceptButton
+@onready var tackle_button = $VBoxContainer/DefenseContainer/TackleButton
+@onready var cover_button = $VBoxContainer/DefenseContainer/CoverButton
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
@@ -41,9 +41,9 @@ func _ready():
 	next_match.pressed.connect(_on_next_match_pressed)
 	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
 	menu_button.theme_type_variation = "GhostButton"
-	press_button.pressed.connect(func():GameState.defend("PRESS"))
-	mark_button.pressed.connect(func():GameState.defend("MARK"))
-	retreat_button.pressed.connect(func():GameState.defend("RETREAT"))
+	intercept_button.pressed.connect(func():GameState.defend("INTERCEPT"))
+	tackle_button.pressed.connect(func():GameState.defend("TACKLE"))
+	cover_button.pressed.connect(func():GameState.defend("COVER"))
 
 	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button]:
 		_add_press_feedback(btn)
@@ -69,16 +69,64 @@ func refresh_ui():
 
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		zone_label.text = "Rodada %d/%d | Fase %d/%d | Zona: %s | Você %d × %d Adversário" % [
-			GameState.round_num, GameState.MAX_ROUNDS, GameState.campaign_stage, GameState.MAX_CAMPAIGN_STAGE, zone_name, GameState.goals, GameState.ai_goals
+			GameState.round_num,
+			GameState.MAX_ROUNDS,
+			GameState.campaign_stage,
+			GameState.MAX_CAMPAIGN_STAGE,
+			zone_name,
+			GameState.goals,
+			GameState.ai_goals
 		]
 	else:
 		zone_label.text = "Desafio | Sequência: %d (recorde: %d) | Rodada %d/%d | Zona: %s | Você %d × %d Adversário" % [
-			GameState.challenge_wins, GameState.challenge_best, GameState.round_num, GameState.MAX_ROUNDS, zone_name, GameState.goals, GameState.ai_goals
+			GameState.challenge_wins,
+			GameState.challenge_best,
+			GameState.round_num,
+			GameState.MAX_ROUNDS,
+			zone_name,
+			GameState.goals,
+			GameState.ai_goals
 		]
 
-	stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  DEF %d   |   Nível %d   XP %d/%d" % [
-		p["name"], p["role"], p["PAS"], p["DRI"], p["SHO"], p["DEF"], GameState.level, GameState.xp, GameState.xp_to_next
-	]
+	if GameState.turn_state == GameState.TurnState.PLAYER_ATTACK:
+
+		stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  DEF %d   |   Nível %d   XP %d/%d" % [
+			p["name"],
+			p["role"],
+			p["PAS"],
+			p["DRI"],
+			p["SHO"],
+			p["DEF"],
+			GameState.level,
+			GameState.xp,
+			GameState.xp_to_next
+		]
+
+	else:
+
+		var action_name = ""
+
+		match GameState.ai_next_move:
+			GameState.AIMove.PASS:
+				action_name = "Passe"
+
+			GameState.AIMove.DRIBBLE:
+				action_name = "Drible"
+
+			GameState.AIMove.LONG_SHOT:
+				action_name = "Chute de Longe"
+
+			GameState.AIMove.SHOT:
+				action_name = "Finalização"
+
+		stats_label.text = "Ataque adversário | Zona: %s | Próxima ação: %s" % [
+			GameState.ZONES[GameState.ai_zone_idx],
+			action_name
+		]
+
+	# ------------------------------
+	# DAQUI PARA BAIXO É FORA DO IF
+	# ------------------------------
 
 	_animate_bar(pas_bar, p["PAS"])
 	_animate_bar(dri_bar, p["DRI"])
@@ -87,11 +135,11 @@ func refresh_ui():
 
 	var in_box = GameState.zone_idx == GameState.ZONES.size() - 1
 	var in_final_third = GameState.zone_idx == 2
+
 	sho_button.disabled = not in_box or GameState.match_over
 	dri_button.disabled = GameState.match_over
 	feint_button.disabled = GameState.match_over
 	long_shot_button.disabled = not in_final_third or GameState.match_over
-	long_shot_button.visible = in_final_third
 
 	var dri_chance = GameState.chance_for("DRI")
 	var feint_chance = GameState.feint_chance()
@@ -105,8 +153,8 @@ func refresh_ui():
 
 	dri_button.modulate = color_for_chance(dri_chance)
 	feint_button.modulate = color_for_chance(feint_chance)
-	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color(1, 1, 1)
-	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color(1, 1, 1)
+	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color.WHITE
+	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color.WHITE
 
 	_rebuild_pass_buttons()
 
@@ -116,21 +164,25 @@ func refresh_ui():
 	log_label.text = "\n".join(GameState.log_messages)
 
 	if GameState.goals > _last_goals:
-		_flash_goal(Color(1, 0.85, 0.3, 1))  # dourado — seu gol
+		_flash_goal(Color(1, 0.85, 0.3, 1))
 	elif GameState.ai_goals > _last_ai_goals:
-		_flash_goal(Color(0.9, 0.3, 0.3, 1))  # vermelho — gol do adversário
+		_flash_goal(Color(0.9, 0.3, 0.3, 1))
+
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
-	var attacking = GameState.turn_state == GameState.TurnState.PLAYER_ATTACK
 
+	var attacking = GameState.turn_state == GameState.TurnState.PLAYER_ATTACK
+	var defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE
+
+	# Ataque
 	dri_button.visible = attacking
-	sho_button.visible = attacking
 	feint_button.visible = attacking
-	long_shot_button.visible = attacking
+	sho_button.visible = attacking
+	long_shot_button.visible = attacking and in_final_third
 	pass_container.visible = attacking
 
-	defense_container.visible = !attacking
-
+	# Defesa
+	defense_container.visible = defending
 func _rebuild_pass_buttons():
 	for child in pass_container.get_children():
 		child.queue_free()
