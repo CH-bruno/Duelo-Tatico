@@ -43,7 +43,7 @@ func _populate_lineup_options():
 		var ob = option_buttons[role_idx]
 		ob.clear()
 		for roster_idx in GameState.candidates_for(role_idx):
-			var player = GameState.roster[roster_idx]
+			var player = GameState.RosterData.ROSTER[roster_idx]
 			ob.add_item(
 				"%s | %s | PAS %d DRI %d SHO %d DEF %d"
 				% [

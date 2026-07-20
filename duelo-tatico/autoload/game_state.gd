@@ -1,95 +1,23 @@
 extends Node
-# Autoload (singleton) que guarda o estado do jogo inteiro.
+# Autoload (singleton) que orquestra o jogo. Dados fixos do elenco viraram
+# RosterData.gd e as fórmulas de chance viraram Rules.gd — esse arquivo
+# agora só guarda o ESTADO (o que está acontecendo agora) e o FLUXO
+# (o que acontece quando o quê).
 
 signal state_changed
 
 const Narration = preload("res://scripts/Narration.gd")
+const RosterData = preload("res://scripts/RosterData.gd")
+const Rules = preload("res://scripts/Rules.gd")
 
 const ZONES = ["Campo Próprio", "Meio-Campo", "Terço Final", "Grande Área"]
 
-const ROLES = ["ZAG", "VOL", "MEI", "CA"]
-
 const MAX_CAMPAIGN_STAGE = 5
-# Elenco completo: 2 candidatos por posição, cada um com um perfil diferente.
-var roster = [
-	{
-		"name": "Rocha",
-		"role": "ZAG",
-		"trait": "PAREDE",
-		"PAS": 55,
-		"DRI": 40,
-		"SHO": 25,
-		"DEF": 65
-	},
-	{
-		"name": "Muralha",
-		"role": "ZAG",
-		"trait": "INTERCEPTADOR",
-		"PAS": 42,
-		"DRI": 30,
-		"SHO": 18,
-		"DEF": 78
-	},
-	{
-		"name": "Diego",
-		"role": "VOL",
-		"trait": "LADRÃO_DE_BOLA",
-		"PAS": 62,
-		"DRI": 50,
-		"SHO": 35,
-		"DEF": 55
-	},
-	{
-		"name": "Kauê",
-		"role": "VOL",
-		"trait": "INCANSÁVEL",
-		"PAS": 52,
-		"DRI": 45,
-		"SHO": 28,
-		"DEF": 68
-	},
-	{
-		"name": "Armando",
-		"role": "MEI",
-		"trait": "DRIBLADOR",
-		"PAS": 58,
-		"DRI": 60,
-		"SHO": 48,
-		"DEF": 35
-	},
-	{
-		"name": "Rafinha",
-		"role": "MEI",
-		"trait": "ARMADOR",
-		"PAS": 70,
-		"DRI": 52,
-		"SHO": 38,
-		"DEF": 25
-	},
-	{
-		"name": "Nunes",
-		"role": "CA",
-		"trait": "FINALIZADOR",
-		"PAS": 40,
-		"DRI": 50,
-		"SHO": 65,
-		"DEF": 25
-	},
-	{
-		"name": "Fominha",
-		"role": "CA",
-		"trait": "ATIRADOR",
-		"PAS": 28,
-		"DRI": 38,
-		"SHO": 78,
-		"DEF": 12
-	},
-]
 
-# Índices do roster escalados como titulares, na mesma ordem de ROLES.
+# Índices do RosterData.ROSTER escalados como titulares, na mesma ordem de RosterData.ROLES.
 var starters = [0, 2, 4, 6]
 
-# squad é montado a partir do roster + starters — ver _apply_lineup().
+# squad é montado a partir do RosterData.ROSTER + starters — ver _apply_lineup().
 # squad[0] = zona 0 (Campo Próprio), squad[1] = zona 1, etc.
 var squad = []
 
@@ -157,18 +85,22 @@ func _ready():
 	SFX.play_whistle()
 
 
+# ---------- Elenco / escalação (delega dados pro RosterData) ----------
+
 func candidates_for(role_idx: int) -> Array:
-	# Retorna os índices do roster que jogam na posição de ROLES[role_idx].
-	var role = ROLES[role_idx]
-	var result = []
-	for i in range(roster.size()):
-		if roster[i]["role"] == role:
-			result.append(i)
-	return result
+	return RosterData.candidates_for(role_idx)
+
+
+func trait_name(trait_id: String) -> String:
+	return RosterData.trait_name(trait_id)
+
+
+func trait_bonus(action: String) -> int:
+	return RosterData.trait_bonus(active_player(), action)
 
 
 func set_lineup(new_starters: Array) -> void:
-	if new_starters.size() != ROLES.size():
+	if new_starters.size() != RosterData.ROLES.size():
 		return
 	starters = new_starters.duplicate()
 	_apply_lineup()
@@ -176,12 +108,13 @@ func set_lineup(new_starters: Array) -> void:
 
 
 func _apply_lineup() -> void:
-	# Monta o squad a partir do roster, aplicando o crescimento por nível
-	# que o time já acumulou — trocar o titular não zera a evolução do time.
+	# Monta o squad a partir do RosterData.ROSTER, aplicando o crescimento
+	# por nível que o time já acumulou — trocar o titular não zera a
+	# evolução do time.
 	var growth_levels = level - 1
 	squad = []
 	for idx in starters:
-		var p = roster[idx].duplicate()
+		var p = RosterData.ROSTER[idx].duplicate()
 		p["PAS"] = min(95, p["PAS"] + 2 * growth_levels)
 		p["DRI"] = min(95, p["DRI"] + 2 * growth_levels)
 		p["SHO"] = min(95, p["SHO"] + 3 * growth_levels)
@@ -200,7 +133,6 @@ func player_gets_ball() -> void:
 	zone_idx = 0
 	active_idx = 0
 
-	# Reinicia o ataque da IA
 	ai_zone_idx = 0
 	ai_active_idx = 0
 	ai_momentum = 0
@@ -209,50 +141,7 @@ func player_gets_ball() -> void:
 	momentum_bonus = 0
 
 
-func trait_name(trait_id: String) -> String:
-	match trait_id:
-		"PAREDE":
-			return "Parede (+Defesa)"
-		"INTERCEPTADOR":
-			return "Interceptador (+Recuperação)"
-		"LADRÃO_DE_BOLA":
-			return "Ladrão de Bola (+Recuperação)"
-		"INCANSÁVEL":
-			return "Incansável (Pressão pós-perda)"
-		"ARMADOR":
-			return "Armador (+Passe)"
-		"DRIBLADOR":
-			return "Driblador (+Drible/Finta)"
-		"FINALIZADOR":
-			return "Finalizador (+Chute)"
-		"ATIRADOR":
-			return "Atirador (+Chute de Longe)"
-		_:
-			return trait_id
-
-
-func trait_bonus(action: String) -> int:
-	var player_trait = active_player()["trait"]
-
-	match player_trait:
-		"ARMADOR":
-			if action == "PASS":
-				return 8
-
-		"DRIBLADOR":
-			if action == "DRI" or action == "FEINT":
-				return 8
-
-		"FINALIZADOR":
-			if action == "SHO":
-				return 8
-
-		"ATIRADOR":
-			if action == "LONG_SHO":
-				return 10
-
-	return 0
-
+# ---------- Dificuldade e chances (delega contas pro Rules) ----------
 
 func difficulty_stage() -> int:
 	# No Desafio, a dificuldade sobe com as vitórias em sequência, sem teto.
@@ -263,9 +152,7 @@ func difficulty_stage() -> int:
 
 
 func opponent_difficulty_for(zone: int) -> int:
-	var base_by_zone = [25, 35, 45, 55]
-	var value = base_by_zone[zone] + int(level * 1.0) + (difficulty_stage() - 1) * 4
-	return min(92, value)
+	return Rules.opponent_difficulty_for(zone, level, difficulty_stage())
 
 
 func opponent_difficulty() -> int:
@@ -273,57 +160,46 @@ func opponent_difficulty() -> int:
 
 
 func ai_attack_strength() -> int:
-	return min(88, 25 + int(level * 0.8) + (difficulty_stage() - 1) * 3)
+	return Rules.ai_attack_strength(level, difficulty_stage())
 
 
 func chance_for(stat_name: String) -> int:
-	var diff = active_player()[stat_name] - opponent_difficulty() + momentum_bonus
-
+	var tb = 0
 	if stat_name == "DRI":
-		diff += trait_bonus("DRI")
+		tb = trait_bonus("DRI")
 	elif stat_name == "SHO":
-		diff += trait_bonus("SHO")
-
-	var pct = 50 + diff * 0.6
-	return clampi(round(pct), 8, 92)
+		tb = trait_bonus("SHO")
+	return Rules.success_chance(active_player()[stat_name], opponent_difficulty(), momentum_bonus, tb)
 
 
 func feint_chance() -> int:
-	# Finta: mistura Drible e Chute (habilidade + confiança pra ir pra cima do marcador).
-	# Base mais dura que o drible normal, mas o prêmio (momentum) é bem maior.
+	# Finta: mistura Drible e Chute. Base mais dura que o drible normal
+	# (por isso soma 8 na dificuldade), mas o prêmio (momentum) é maior.
 	var stat_avg = (active_player()["DRI"] + active_player()["SHO"]) / 2.0
-	var diff = stat_avg - opponent_difficulty() - 8 + momentum_bonus
-	diff += trait_bonus("FEINT")
-	var pct = 50 + diff * 0.6
-	return clampi(round(pct), 5, 90)
+	var tb = trait_bonus("FEINT")
+	return Rules.success_chance(stat_avg, opponent_difficulty() + 8, momentum_bonus, tb, 5, 90)
 
 
 func long_shot_chance() -> int:
-	# Chute de longe: só faz sentido na Terço Final, com penalidade fixa pela distância do gol.
-	var diff = active_player()["SHO"] - opponent_difficulty() - 20 + momentum_bonus
-	diff += trait_bonus("LONG_SHO")
-	var pct = 50 + diff * 0.6
-	return clampi(round(pct), 5, 85)
+	# Só faz sentido na Terço Final; soma 20 na dificuldade pela distância do gol.
+	var tb = trait_bonus("LONG_SHO")
+	return Rules.success_chance(active_player()["SHO"], opponent_difficulty() + 20, momentum_bonus, tb, 5, 85)
 
 
 func pass_chance_to(target_idx: int) -> int:
 	var distance = abs(target_idx - zone_idx)
-
 	var adjacent_bonus = 14 if distance == 1 else 0
 	var distance_penalty = max(0, distance - 1) * 15
 	var momentum_effect = (momentum_bonus * 1.5) if distance >= 2 else float(momentum_bonus)
-
 	var target_difficulty = opponent_difficulty_for(target_idx)
+	var tb = trait_bonus("PASS")
 
-	var diff = active_player()["PAS"] - target_difficulty
-	diff -= distance_penalty
-	diff += adjacent_bonus
-	diff += momentum_effect
-	diff += trait_bonus("PASS")
+	# distance_penalty/adjacent_bonus entram como parte da "dificuldade efetiva"
+	var effective_difficulty = target_difficulty + distance_penalty - adjacent_bonus
+	return Rules.success_chance(active_player()["PAS"], effective_difficulty, momentum_effect, tb)
 
-	var pct = 50 + diff * 0.6
-	return clampi(round(pct), 8, 92)
 
+# ---------- Ações do jogador ----------
 
 func attempt(action: String, target_idx: int = -1) -> void:
 	if match_over:
@@ -347,10 +223,8 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			goals += 1
 			streak += 1
 			grant_xp(15)
-
 			push_log(Narration.GOAL.pick_random() % [passer_name])
 			SFX.play_goal()
-
 			_kickoff()
 			ai_turn()
 		else:
@@ -364,10 +238,8 @@ func attempt(action: String, target_idx: int = -1) -> void:
 		if success:
 			grant_xp(6)
 			streak += 1
-
 			push_log(Narration.DRIBBLE.pick_random() % [passer_name])
 			SFX.play_pass_success()
-
 			momentum_bonus = 22
 		else:
 			grant_xp(1)
@@ -380,10 +252,8 @@ func attempt(action: String, target_idx: int = -1) -> void:
 		if success:
 			grant_xp(9)
 			streak += 1
-
 			push_log(Narration.FEINT.pick_random() % [passer_name])
 			SFX.play_pass_success()
-
 			momentum_bonus = 30
 		else:
 			grant_xp(1)
@@ -401,10 +271,8 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			goals += 1
 			streak += 1
 			grant_xp(20)
-
 			push_log(Narration.LONG_GOAL.pick_random() % [passer_name])
 			SFX.play_goal()
-
 			_kickoff()
 			ai_turn()
 		else:
@@ -415,14 +283,11 @@ func attempt(action: String, target_idx: int = -1) -> void:
 	else:  # PASS
 		var succ_chance = pass_chance_to(target_idx)
 		var success = randi_range(1, 100) <= succ_chance
-
 		if success:
 			grant_xp(4)
 			streak += 1
-
 			push_log(Narration.PASS_SUCCESS.pick_random() % [passer_name, target_name])
 			SFX.play_pass_success()
-
 			zone_idx = target_idx
 			active_idx = target_idx
 			momentum_bonus = 8
@@ -443,7 +308,6 @@ func recover_possession() -> void:
 
 	if squad[0]["trait"] == "INTERCEPTADOR":
 		zag_def += 12
-
 	if squad[1]["trait"] == "LADRÃO_DE_BOLA":
 		vol_def += 12
 
@@ -482,6 +346,8 @@ func _advance_round() -> void:
 			push_log("Empate em %d × %d." % [goals, ai_goals])
 			push_log("Sua campanha terminou. Clique em 'Novo Jogo' para recomeçar.")
 
+
+# ---------- IA / defesa ----------
 
 func ai_active_player_zone() -> int:
 	return ai_zone_idx
@@ -537,8 +403,6 @@ func _choose_ai_move() -> void:
 
 
 func _resolve_ai_shot(bonus: int = 0) -> void:
-	# bonus é a penalidade/vantagem vinda da defesa escolhida pelo jogador
-	# (valores negativos = você dificultou o gol).
 	var attack = ai_attack_strength()
 
 	var zag = squad[0]["DEF"]
@@ -550,7 +414,6 @@ func _resolve_ai_shot(bonus: int = 0) -> void:
 		vol += 5
 
 	var def_value = round(zag * 0.7 + vol * 0.3)
-
 	var diff = attack - def_value
 	var chance = clampi(round(50 + diff * 0.6) + bonus, 8, 92)
 
@@ -563,41 +426,6 @@ func _resolve_ai_shot(bonus: int = 0) -> void:
 		grant_xp(3)
 		push_log("%s e %s seguraram o contra-ataque." % [squad[0]["name"], squad[1]["name"]])
 		recover_possession()
-
-
-func grant_xp(amount: int) -> void:
-	xp += amount
-	while xp >= xp_to_next:
-		xp -= xp_to_next
-		level += 1
-		xp_to_next = int(round(xp_to_next * 1.35))
-		for player in squad:
-
-			match player["role"]:
-
-				"ZAG":
-					player["PAS"] = min(95, player["PAS"] + 1)
-					player["DRI"] = min(95, player["DRI"] + 1)
-					player["SHO"] = min(95, player["SHO"] + 1)
-					player["DEF"] = min(95, player["DEF"] + 3)
-
-				"VOL":
-					player["PAS"] = min(95, player["PAS"] + 2)
-					player["DRI"] = min(95, player["DRI"] + 2)
-					player["SHO"] = min(95, player["SHO"] + 1)
-					player["DEF"] = min(95, player["DEF"] + 2)
-
-				"MEI":
-					player["PAS"] = min(95, player["PAS"] + 3)
-					player["DRI"] = min(95, player["DRI"] + 2)
-					player["SHO"] = min(95, player["SHO"] + 2)
-					player["DEF"] = min(95, player["DEF"] + 1)
-
-				"CA":
-					player["PAS"] = min(95, player["PAS"] + 1)
-					player["DRI"] = min(95, player["DRI"] + 2)
-					player["SHO"] = min(95, player["SHO"] + 3)
-					player["DEF"] = min(95, player["DEF"] + 1)
 
 
 func _reset_possession(reason: String) -> void:
@@ -664,15 +492,16 @@ func ai_pass_chance() -> int:
 
 
 func _ai_resolve_attack(pass_penalty: int, shot_penalty: int, extra_penalty: int = 0) -> void:
-	# NÃO chama _choose_ai_move() aqui — a jogada já foi escolhida e anunciada
-	# em ai_turn(); resolver de novo aqui trocaria a jogada depois de anunciada.
+	# Não chama _choose_ai_move() aqui — a jogada já foi escolhida e
+	# anunciada em ai_turn(); resolver de novo trocaria a jogada depois
+	# de já ter avisado qual seria.
 	match ai_next_move:
 		AIMove.PASS:
 			var chance = clampi(ai_pass_chance() + pass_penalty + extra_penalty, 10, 95)
 			if randi_range(1, 100) <= chance:
 				ai_zone_idx += 1
 				push_log("O passe do adversário encontrou um companheiro.")
-				ai_turn()  # continua o ataque da IA — escolhe a próxima jogada
+				ai_turn()
 			else:
 				push_log("Você interceptou o passe!")
 				recover_possession()
@@ -702,11 +531,45 @@ func _ai_resolve_attack(pass_penalty: int, shot_penalty: int, extra_penalty: int
 	state_changed.emit()
 
 
+# ---------- XP / progressão ----------
+
+func grant_xp(amount: int) -> void:
+	xp += amount
+	while xp >= xp_to_next:
+		xp -= xp_to_next
+		level += 1
+		xp_to_next = int(round(xp_to_next * 1.35))
+		for player in squad:
+			match player["role"]:
+				"ZAG":
+					player["PAS"] = min(95, player["PAS"] + 1)
+					player["DRI"] = min(95, player["DRI"] + 1)
+					player["SHO"] = min(95, player["SHO"] + 1)
+					player["DEF"] = min(95, player["DEF"] + 3)
+				"VOL":
+					player["PAS"] = min(95, player["PAS"] + 2)
+					player["DRI"] = min(95, player["DRI"] + 2)
+					player["SHO"] = min(95, player["SHO"] + 1)
+					player["DEF"] = min(95, player["DEF"] + 2)
+				"MEI":
+					player["PAS"] = min(95, player["PAS"] + 3)
+					player["DRI"] = min(95, player["DRI"] + 2)
+					player["SHO"] = min(95, player["SHO"] + 2)
+					player["DEF"] = min(95, player["DEF"] + 1)
+				"CA":
+					player["PAS"] = min(95, player["PAS"] + 1)
+					player["DRI"] = min(95, player["DRI"] + 2)
+					player["SHO"] = min(95, player["SHO"] + 3)
+					player["DEF"] = min(95, player["DEF"] + 1)
+
+
 func push_log(text: String) -> void:
 	log_messages.push_front(text)
 	if log_messages.size() > 6:
 		log_messages.resize(6)
 
+
+# ---------- Fluxo entre partidas ----------
 
 func next_match() -> void:
 	if not match_over or goals <= ai_goals:
