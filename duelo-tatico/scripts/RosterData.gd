@@ -1,24 +1,25 @@
 extends RefCounted
 # Dados fixos do elenco: quem existe, atributos base, traits.
-# Sem estado próprio — só dados e funções puras. Não sabe nada sobre
-# "o jogo agora" (zona, placar, etc.) — só quem SÃO os jogadores.
+# Sem estado próprio — só dados e funções puras.
 
 const ROLES = ["ZAG", "VOL", "MEI", "CA"]
 
+# PAS/DRI/SHO = ataque. INT (Interceptação, contra Passe),
+# TAC (Desarme, contra Drible) e BLQ (Bloqueio, contra Chute) = defesa,
+# cada um contando pra um tipo de jogada específico do adversário.
 const ROSTER = [
-	{"name": "Rocha", "role": "ZAG", "trait": "PAREDE", "PAS": 55, "DRI": 40, "SHO": 25, "DEF": 65},
-	{"name": "Muralha", "role": "ZAG", "trait": "INTERCEPTADOR", "PAS": 42, "DRI": 30, "SHO": 18, "DEF": 78},
-	{"name": "Diego", "role": "VOL", "trait": "LADRÃO_DE_BOLA", "PAS": 62, "DRI": 50, "SHO": 35, "DEF": 55},
-	{"name": "Kauê", "role": "VOL", "trait": "INCANSÁVEL", "PAS": 52, "DRI": 45, "SHO": 28, "DEF": 68},
-	{"name": "Armando", "role": "MEI", "trait": "DRIBLADOR", "PAS": 58, "DRI": 60, "SHO": 48, "DEF": 35},
-	{"name": "Rafinha", "role": "MEI", "trait": "ARMADOR", "PAS": 70, "DRI": 52, "SHO": 38, "DEF": 25},
-	{"name": "Nunes", "role": "CA", "trait": "FINALIZADOR", "PAS": 40, "DRI": 50, "SHO": 65, "DEF": 25},
-	{"name": "Fominha", "role": "CA", "trait": "ATIRADOR", "PAS": 28, "DRI": 38, "SHO": 78, "DEF": 12},
+	{"name": "Rocha", "role": "ZAG", "trait": "PAREDE", "PAS": 55, "DRI": 40, "SHO": 25, "INT": 45, "TAC": 50, "BLQ": 75},
+	{"name": "Muralha", "role": "ZAG", "trait": "INTERCEPTADOR", "PAS": 42, "DRI": 30, "SHO": 18, "INT": 80, "TAC": 55, "BLQ": 60},
+	{"name": "Diego", "role": "VOL", "trait": "LADRÃO_DE_BOLA", "PAS": 62, "DRI": 50, "SHO": 35, "INT": 45, "TAC": 70, "BLQ": 35},
+	{"name": "Kauê", "role": "VOL", "trait": "INCANSÁVEL", "PAS": 52, "DRI": 45, "SHO": 28, "INT": 50, "TAC": 60, "BLQ": 45},
+	{"name": "Armando", "role": "MEI", "trait": "DRIBLADOR", "PAS": 58, "DRI": 60, "SHO": 48, "INT": 30, "TAC": 35, "BLQ": 25},
+	{"name": "Rafinha", "role": "MEI", "trait": "ARMADOR", "PAS": 70, "DRI": 52, "SHO": 38, "INT": 25, "TAC": 30, "BLQ": 20},
+	{"name": "Nunes", "role": "CA", "trait": "FINALIZADOR", "PAS": 40, "DRI": 50, "SHO": 65, "INT": 20, "TAC": 25, "BLQ": 25},
+	{"name": "Fominha", "role": "CA", "trait": "ATIRADOR", "PAS": 28, "DRI": 38, "SHO": 78, "INT": 15, "TAC": 15, "BLQ": 15},
 ]
 
 
 static func candidates_for(role_idx: int) -> Array:
-	# Retorna os índices do ROSTER que jogam na posição de ROLES[role_idx].
 	var role = ROLES[role_idx]
 	var result = []
 	for i in range(ROSTER.size()):
@@ -30,11 +31,11 @@ static func candidates_for(role_idx: int) -> Array:
 static func trait_name(trait_id: String) -> String:
 	match trait_id:
 		"PAREDE":
-			return "Parede (+Defesa)"
+			return "Parede (+Bloqueio)"
 		"INTERCEPTADOR":
-			return "Interceptador (+Recuperação)"
+			return "Interceptador (+Interceptação)"
 		"LADRÃO_DE_BOLA":
-			return "Ladrão de Bola (+Recuperação)"
+			return "Ladrão de Bola (+Desarme)"
 		"INCANSÁVEL":
 			return "Incansável (Pressão pós-perda)"
 		"ARMADOR":
@@ -50,8 +51,6 @@ static func trait_name(trait_id: String) -> String:
 
 
 static func trait_bonus(player: Dictionary, action: String) -> int:
-	# Recebe o jogador como parâmetro (em vez de ler "o jogador ativo" de
-	# algum lugar global) — assim essa função não depende de mais nada.
 	match player["trait"]:
 		"ARMADOR":
 			if action == "PASS":
@@ -65,4 +64,13 @@ static func trait_bonus(player: Dictionary, action: String) -> int:
 		"ATIRADOR":
 			if action == "LONG_SHO":
 				return 10
+		"PAREDE":
+			if action == "BLOCK":
+				return 10
+		"INTERCEPTADOR":
+			if action == "INTERCEPT":
+				return 14
+		"LADRÃO_DE_BOLA":
+			if action == "TACKLE":
+				return 12
 	return 0

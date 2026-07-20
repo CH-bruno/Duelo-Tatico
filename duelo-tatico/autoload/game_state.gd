@@ -9,6 +9,7 @@ signal state_changed
 const Narration = preload("res://scripts/Narration.gd")
 const RosterData = preload("res://scripts/RosterData.gd")
 const Rules = preload("res://scripts/Rules.gd")
+const OpponentTeams = preload("res://scripts/OpponentTeams.gd")
 
 const ZONES = ["Campo Próprio", "Meio-Campo", "Terço Final", "Grande Área"]
 
@@ -118,7 +119,9 @@ func _apply_lineup() -> void:
 		p["PAS"] = min(95, p["PAS"] + 2 * growth_levels)
 		p["DRI"] = min(95, p["DRI"] + 2 * growth_levels)
 		p["SHO"] = min(95, p["SHO"] + 3 * growth_levels)
-		p["DEF"] = min(95, p["DEF"] + 2 * growth_levels)
+		p["INT"] = min(95, p["INT"] + 2 * growth_levels)
+		p["TAC"] = min(95, p["TAC"] + 2 * growth_levels)
+		p["BLQ"] = min(95, p["BLQ"] + 2 * growth_levels)
 		squad.append(p)
 
 
@@ -139,6 +142,20 @@ func player_gets_ball() -> void:
 
 	streak = 0
 	momentum_bonus = 0
+
+
+func current_opponent_team() -> Dictionary:
+	if game_mode == GameMode.CHALLENGE:
+		return OpponentTeams.team_for_challenge(challenge_wins)
+	return OpponentTeams.team_for_stage(campaign_stage)
+
+
+func opponent_team_name() -> String:
+	return current_opponent_team()["name"]
+
+
+func ai_active_player() -> Dictionary:
+	return current_opponent_team()["squad"][ai_zone_idx]
 
 
 # ---------- Dificuldade e chances (delega contas pro Rules) ----------
@@ -299,29 +316,36 @@ func attempt(action: String, target_idx: int = -1) -> void:
 	_advance_round()
 	state_changed.emit()
 
+func defender_for_zone(zone:int) -> int:
 
-func recover_possession() -> void:
+	match zone:
+		0: return 3 # CA pressiona o ZAG
+		1: return 2 # MEI marca o VOL
+		2: return 1 # VOL marca o MEI
+		3: return 0 # ZAG marca o CA
+
+	return 0
+
+func recover_possession(defender_idx:int):
+
 	player_gets_ball()
 
-	var zag_def = squad[0]["DEF"]
-	var vol_def = squad[1]["DEF"]
+	active_idx = defender_idx
+	zone_idx = defender_idx
 
-	if squad[0]["trait"] == "INTERCEPTADOR":
-		zag_def += 12
-	if squad[1]["trait"] == "LADRÃO_DE_BOLA":
-		vol_def += 12
+	match squad[defender_idx]["role"]:
 
-	var total = zag_def + vol_def
-	var roll = randi_range(1, total)
+		"ZAG":
+			push_log(Narration.ZAG_RECOVERY.pick_random() % squad[defender_idx]["name"])
 
-	if roll <= zag_def:
-		zone_idx = 0
-		active_idx = 0
-		push_log(Narration.ZAG_RECOVERY.pick_random() % [squad[0]["name"]])
-	else:
-		zone_idx = 1
-		active_idx = 1
-		push_log(Narration.VOL_RECOVERY.pick_random() % [squad[1]["name"]])
+		"VOL":
+			push_log(Narration.VOL_RECOVERY.pick_random() % squad[defender_idx]["name"])
+
+		"MEI":
+			push_log(Narration.MEI_RECOVERY.pick_random() % squad[defender_idx]["name"])
+
+		"CA":
+			push_log(Narration.CA_RECOVERY.pick_random() % squad[defender_idx]["name"])
 
 	possession = Possession.PLAYER
 	streak = 0
@@ -404,17 +428,8 @@ func _choose_ai_move() -> void:
 
 func _resolve_ai_shot(bonus: int = 0) -> void:
 	var attack = ai_attack_strength()
-
-	var zag = squad[0]["DEF"]
-	if squad[0]["trait"] == "PAREDE":
-		zag += 8
-
-	var vol = squad[1]["DEF"]
-	if squad[1]["trait"] == "LADRÃO_DE_BOLA":
-		vol += 5
-
-	var def_value = round(zag * 0.7 + vol * 0.3)
-	var diff = attack - def_value
+	var block_value = _defense_effectiveness("BLOCK")
+	var diff = attack - block_value
 	var chance = clampi(round(50 + diff * 0.6) + bonus, 8, 92)
 
 	if randi_range(1, 100) <= chance:
@@ -424,8 +439,7 @@ func _resolve_ai_shot(bonus: int = 0) -> void:
 		_kickoff()
 	else:
 		grant_xp(3)
-		push_log("%s e %s seguraram o contra-ataque." % [squad[0]["name"], squad[1]["name"]])
-		recover_possession()
+		recover_possession(0) # ZAG recupera a posse
 
 
 func _reset_possession(reason: String) -> void:
@@ -436,99 +450,79 @@ func _reset_possession(reason: String) -> void:
 	ai_turn()
 
 
+func defense_chance(action: String) -> int:
+	# Só calcula a chance, sem resolver nada — pra UI mostrar a % nos botões.
+	var matches = _defense_matches_move(action, ai_next_move)
+	var effectiveness = _defense_effectiveness(action)
+	if not matches:
+		effectiveness = int(effectiveness * 0.5)
+	return clampi(round(50 + (effectiveness - ai_attack_strength()) * 0.6), 8, 92)
+
+
 func defend(action: String) -> void:
 	if turn_state != TurnState.PLAYER_DEFENSE:
 		return
 
-	match action:
+	var chance = defense_chance(action)
+	var success = randi_range(1, 100) <= chance
+
+	var defender_idx = defender_for_zone(ai_zone_idx)
+
+	if success:
+		push_log("Sua defesa (%s) funcionou! (%d%% de chance)" % [_defense_label(action), chance])
+		recover_possession(defender_idx)
+	else:
+		push_log("A defesa (%s) não foi suficiente (%d%% de chance)." % [_defense_label(action), chance])
+		_ai_move_succeeds()
+
+	state_changed.emit()
+
+func _defense_matches_move(defense_type: String, move) -> bool:
+	match defense_type:
 		"INTERCEPT":
-			_resolve_defense_intercept()
+			return move == AIMove.PASS
 		"TACKLE":
-			_resolve_defense_tackle()
-		"COVER":
-			_resolve_defense_cover()
+			return move == AIMove.DRIBBLE
+		"BLOCK":
+			return move == AIMove.SHOT or move == AIMove.LONG_SHOT
+	return false
 
-	state_changed.emit()
+
+func _defense_label(defense_type: String) -> String:
+	match defense_type:
+		"INTERCEPT": return "Interceptação"
+		"TACKLE": return "Desarme"
+		"BLOCK": return "Bloqueio"
+	return defense_type
 
 
-func _resolve_defense_intercept() -> void:
+func _defense_effectiveness(defense_type: String) -> int:
+	# Zagueiro pesa mais que o Volante na defesa, igual já era antes.
+	var zag_stat = _stat_for_defense(squad[0], defense_type)
+	var vol_stat = _stat_for_defense(squad[1], defense_type)
+	return round(zag_stat * 0.7 + vol_stat * 0.3)
+
+
+func _stat_for_defense(player: Dictionary, defense_type: String) -> int:
+	var base = 0
+	match defense_type:
+		"INTERCEPT":
+			base = player["INT"]
+		"TACKLE":
+			base = player["TAC"]
+		"BLOCK":
+			base = player["BLQ"]
+	return base + RosterData.trait_bonus(player, defense_type)
+
+
+func _ai_move_succeeds() -> void:
 	match ai_next_move:
-		AIMove.PASS:
-			_ai_resolve_attack(70, -20, 0)
-		AIMove.DRIBBLE:
-			_ai_resolve_attack(20, 10, 0)
-		AIMove.LONG_SHOT:
-			_ai_resolve_attack(10, 0, 0)
-		AIMove.SHOT:
-			_ai_resolve_attack(10, 0, 0)
-
-
-func _resolve_defense_tackle() -> void:
-	match ai_next_move:
-		AIMove.PASS:
-			_ai_resolve_attack(30, 5, 0)
-		AIMove.DRIBBLE:
-			_ai_resolve_attack(75, -15, 0)
-		AIMove.LONG_SHOT:
-			_ai_resolve_attack(20, 0, 0)
-		AIMove.SHOT:
-			_ai_resolve_attack(20, 0, 0)
-
-
-func _resolve_defense_cover() -> void:
-	match ai_next_move:
-		AIMove.PASS:
-			_ai_resolve_attack(20, 15, -10)
-		AIMove.DRIBBLE:
-			_ai_resolve_attack(20, 10, -10)
-		AIMove.LONG_SHOT:
-			_ai_resolve_attack(40, 0, -30)
-		AIMove.SHOT:
-			_ai_resolve_attack(45, 0, -35)
-
-
-func ai_pass_chance() -> int:
-	return clampi(80 - ai_zone_idx * 8, 30, 90)
-
-
-func _ai_resolve_attack(pass_penalty: int, shot_penalty: int, extra_penalty: int = 0) -> void:
-	# Não chama _choose_ai_move() aqui — a jogada já foi escolhida e
-	# anunciada em ai_turn(); resolver de novo trocaria a jogada depois
-	# de já ter avisado qual seria.
-	match ai_next_move:
-		AIMove.PASS:
-			var chance = clampi(ai_pass_chance() + pass_penalty + extra_penalty, 10, 95)
-			if randi_range(1, 100) <= chance:
-				ai_zone_idx += 1
-				push_log("O passe do adversário encontrou um companheiro.")
-				ai_turn()
-			else:
-				push_log("Você interceptou o passe!")
-				recover_possession()
-
-		AIMove.DRIBBLE:
-			var chance = clampi(65 - ai_zone_idx * 4 + difficulty_stage() * 2 + pass_penalty + extra_penalty, 10, 95)
-			if randi_range(1, 100) <= chance:
-				ai_zone_idx += 1
-				push_log("O atacante passou pela marcação.")
-				ai_turn()
-			else:
-				push_log("Você roubou a bola!")
-				recover_possession()
-
-		AIMove.LONG_SHOT:
-			var chance = clampi(18 + difficulty_stage() * 3 + shot_penalty + extra_penalty, 5, 80)
-			if randi_range(1, 100) <= chance:
-				push_log("O chute de longe passou pela defesa!")
-				_resolve_ai_shot(shot_penalty + extra_penalty)
-			else:
-				push_log("O chute saiu para fora.")
-				recover_possession()
-
-		AIMove.SHOT:
-			_resolve_ai_shot(shot_penalty + extra_penalty)
-
-	state_changed.emit()
+		AIMove.PASS, AIMove.DRIBBLE:
+			ai_zone_idx += 1
+			push_log("O adversário avançou com a jogada.")
+			ai_turn()  # continua o ataque — escolhe a próxima jogada
+		AIMove.LONG_SHOT, AIMove.SHOT:
+			_resolve_ai_shot()  # o chute em si ainda passa pelo Bloqueio (BLQ) do time
 
 
 # ---------- XP / progressão ----------
@@ -545,22 +539,30 @@ func grant_xp(amount: int) -> void:
 					player["PAS"] = min(95, player["PAS"] + 1)
 					player["DRI"] = min(95, player["DRI"] + 1)
 					player["SHO"] = min(95, player["SHO"] + 1)
-					player["DEF"] = min(95, player["DEF"] + 3)
+					player["INT"] = min(95, player["INT"] + 2)
+					player["TAC"] = min(95, player["TAC"] + 2)
+					player["BLQ"] = min(95, player["BLQ"] + 3)
 				"VOL":
 					player["PAS"] = min(95, player["PAS"] + 2)
 					player["DRI"] = min(95, player["DRI"] + 2)
 					player["SHO"] = min(95, player["SHO"] + 1)
-					player["DEF"] = min(95, player["DEF"] + 2)
+					player["INT"] = min(95, player["INT"] + 2)
+					player["TAC"] = min(95, player["TAC"] + 3)
+					player["BLQ"] = min(95, player["BLQ"] + 1)
 				"MEI":
 					player["PAS"] = min(95, player["PAS"] + 3)
 					player["DRI"] = min(95, player["DRI"] + 2)
 					player["SHO"] = min(95, player["SHO"] + 2)
-					player["DEF"] = min(95, player["DEF"] + 1)
+					player["INT"] = min(95, player["INT"] + 1)
+					player["TAC"] = min(95, player["TAC"] + 1)
+					player["BLQ"] = min(95, player["BLQ"] + 1)
 				"CA":
 					player["PAS"] = min(95, player["PAS"] + 1)
 					player["DRI"] = min(95, player["DRI"] + 2)
 					player["SHO"] = min(95, player["SHO"] + 3)
-					player["DEF"] = min(95, player["DEF"] + 1)
+					player["INT"] = min(95, player["INT"] + 1)
+					player["TAC"] = min(95, player["TAC"] + 1)
+					player["BLQ"] = min(95, player["BLQ"] + 1)
 
 
 func push_log(text: String) -> void:

@@ -10,18 +10,15 @@ extends Control
 @onready var feint_button: Button = $VBoxContainer/HBoxContainer/FeintButton
 @onready var sho_button: Button = $VBoxContainer/HBoxContainer/ShoButton
 @onready var long_shot_button: Button = $VBoxContainer/HBoxContainer/LongShotButton
-@onready var pas_bar: ProgressBar = $VBoxContainer/PasBar
-@onready var dri_bar: ProgressBar = $VBoxContainer/DriBar
-@onready var sho_bar: ProgressBar = $VBoxContainer/ShoBar
-@onready var def_bar: ProgressBar = $VBoxContainer/DefBar
 @onready var reset_button: Button = $VBoxContainer/ResetButton
 @onready var next_match: Button = $VBoxContainer/NextMatchButton
 @onready var menu_button: Button = $VBoxContainer/MenuButton
 @onready var goal_flash: ColorRect = $GoalFlash
-@onready var defense_container = $VBoxContainer/DefenseContainer
-@onready var intercept_button = $VBoxContainer/DefenseContainer/InterceptButton
-@onready var tackle_button = $VBoxContainer/DefenseContainer/TackleButton
-@onready var cover_button = $VBoxContainer/DefenseContainer/CoverButton
+@onready var defense_container: HBoxContainer = $VBoxContainer/DefenseContainer
+@onready var intercept_button: Button = $VBoxContainer/DefenseContainer/InterceptButton
+@onready var tackle_button: Button = $VBoxContainer/DefenseContainer/TackleButton
+@onready var block_button: Button = $VBoxContainer/DefenseContainer/BlockButton
+@onready var attack_container: HBoxContainer = $VBoxContainer/HBoxContainer
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
@@ -41,11 +38,12 @@ func _ready():
 	next_match.pressed.connect(_on_next_match_pressed)
 	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
 	menu_button.theme_type_variation = "GhostButton"
-	intercept_button.pressed.connect(func():GameState.defend("INTERCEPT"))
-	tackle_button.pressed.connect(func():GameState.defend("TACKLE"))
-	cover_button.pressed.connect(func():GameState.defend("COVER"))
 
-	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button]:
+	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
+	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
+	block_button.pressed.connect(func(): GameState.defend("BLOCK"))
+
+	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button, intercept_button, tackle_button, block_button]:
 		_add_press_feedback(btn)
 
 	goal_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -60,86 +58,46 @@ func _ready():
 
 func refresh_ui():
 	var p = GameState.active_player()
-	var zone_name = ""
-
-	if GameState.possession == GameState.Possession.PLAYER:
-		zone_name = GameState.ZONES[GameState.zone_idx]
-	else:
-		zone_name = "Ataque IA - %s" % GameState.ZONES[GameState.ai_zone_idx]
+	var zone_name = GameState.ZONES[GameState.zone_idx]
 
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		zone_label.text = "Rodada %d/%d | Fase %d/%d | Zona: %s | Você %d × %d Adversário" % [
-			GameState.round_num,
-			GameState.MAX_ROUNDS,
-			GameState.campaign_stage,
-			GameState.MAX_CAMPAIGN_STAGE,
-			zone_name,
-			GameState.goals,
-			GameState.ai_goals
+			GameState.round_num, GameState.MAX_ROUNDS, GameState.campaign_stage, GameState.MAX_CAMPAIGN_STAGE, zone_name, GameState.goals, GameState.ai_goals
 		]
 	else:
 		zone_label.text = "Desafio | Sequência: %d (recorde: %d) | Rodada %d/%d | Zona: %s | Você %d × %d Adversário" % [
-			GameState.challenge_wins,
-			GameState.challenge_best,
-			GameState.round_num,
-			GameState.MAX_ROUNDS,
-			zone_name,
-			GameState.goals,
-			GameState.ai_goals
+			GameState.challenge_wins, GameState.challenge_best, GameState.round_num, GameState.MAX_ROUNDS, zone_name, GameState.goals, GameState.ai_goals
 		]
 
-	if GameState.turn_state == GameState.TurnState.PLAYER_ATTACK:
+	stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  INT %d  TAC %d  BLQ %d   |   Nível %d   XP %d/%d" % [
+		p["name"], p["role"], p["PAS"], p["DRI"], p["SHO"], p["INT"], p["TAC"], p["BLQ"], GameState.level, GameState.xp, GameState.xp_to_next
+	]
 
-		stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  DEF %d   |   Nível %d   XP %d/%d" % [
-			p["name"],
-			p["role"],
-			p["PAS"],
-			p["DRI"],
-			p["SHO"],
-			p["DEF"],
-			GameState.level,
-			GameState.xp,
-			GameState.xp_to_next
-		]
+	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
+	attack_container.visible = not is_defending
+	pass_container.visible = not is_defending
+	defense_container.visible = is_defending
 
-	else:
+	if is_defending:
+		var int_chance = GameState.defense_chance("INTERCEPT")
+		var tac_chance = GameState.defense_chance("TACKLE")
+		var blq_chance = GameState.defense_chance("BLOCK")
 
-		var action_name = ""
+		intercept_button.text = "Interceptação (%d%%)" % int_chance
+		tackle_button.text = "Desarme (%d%%)" % tac_chance
+		block_button.text = "Bloqueio (%d%%)" % blq_chance
 
-		match GameState.ai_next_move:
-			GameState.AIMove.PASS:
-				action_name = "Passe"
-
-			GameState.AIMove.DRIBBLE:
-				action_name = "Drible"
-
-			GameState.AIMove.LONG_SHOT:
-				action_name = "Chute de Longe"
-
-			GameState.AIMove.SHOT:
-				action_name = "Finalização"
-
-		stats_label.text = "Ataque adversário | Zona: %s | Próxima ação: %s" % [
-			GameState.ZONES[GameState.ai_zone_idx],
-			action_name
-		]
-
-	# ------------------------------
-	# DAQUI PARA BAIXO É FORA DO IF
-	# ------------------------------
-
-	_animate_bar(pas_bar, p["PAS"])
-	_animate_bar(dri_bar, p["DRI"])
-	_animate_bar(sho_bar, p["SHO"])
-	_animate_bar(def_bar, p["DEF"])
+		intercept_button.modulate = color_for_chance(int_chance)
+		tackle_button.modulate = color_for_chance(tac_chance)
+		block_button.modulate = color_for_chance(blq_chance)
 
 	var in_box = GameState.zone_idx == GameState.ZONES.size() - 1
 	var in_final_third = GameState.zone_idx == 2
-
 	sho_button.disabled = not in_box or GameState.match_over
 	dri_button.disabled = GameState.match_over
 	feint_button.disabled = GameState.match_over
 	long_shot_button.disabled = not in_final_third or GameState.match_over
+	long_shot_button.visible = in_final_third
 
 	var dri_chance = GameState.chance_for("DRI")
 	var feint_chance = GameState.feint_chance()
@@ -153,8 +111,8 @@ func refresh_ui():
 
 	dri_button.modulate = color_for_chance(dri_chance)
 	feint_button.modulate = color_for_chance(feint_chance)
-	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color.WHITE
-	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color.WHITE
+	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color(1, 1, 1)
+	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color(1, 1, 1)
 
 	_rebuild_pass_buttons()
 
@@ -164,25 +122,13 @@ func refresh_ui():
 	log_label.text = "\n".join(GameState.log_messages)
 
 	if GameState.goals > _last_goals:
-		_flash_goal(Color(1, 0.85, 0.3, 1))
+		_flash_goal(Color(1, 0.85, 0.3, 1))  # dourado — seu gol
 	elif GameState.ai_goals > _last_ai_goals:
-		_flash_goal(Color(0.9, 0.3, 0.3, 1))
-
+		_flash_goal(Color(0.9, 0.3, 0.3, 1))  # vermelho — gol do adversário
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
 
-	var attacking = GameState.turn_state == GameState.TurnState.PLAYER_ATTACK
-	var defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE
 
-	# Ataque
-	dri_button.visible = attacking
-	feint_button.visible = attacking
-	sho_button.visible = attacking
-	long_shot_button.visible = attacking and in_final_third
-	pass_container.visible = attacking
-
-	# Defesa
-	defense_container.visible = defending
 func _rebuild_pass_buttons():
 	for child in pass_container.get_children():
 		child.queue_free()
@@ -207,12 +153,6 @@ func _rebuild_pass_buttons():
 func color_for_chance(chance_pct: int) -> Color:
 	var t = clampf(chance_pct / 100.0, 0.0, 1.0)
 	return Color(1.0, 0.3, 0.3).lerp(Color(0.4, 1.0, 0.4), t)
-
-
-func _animate_bar(bar: ProgressBar, new_value: float) -> void:
-	# Anima o valor da barra suavemente, em vez de pular direto pro número novo.
-	var tween = create_tween()
-	tween.tween_property(bar, "value", new_value, 0.35).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 func _flash_goal(color: Color) -> void:

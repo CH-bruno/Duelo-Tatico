@@ -80,3 +80,16 @@ const VOL_RECOVERY = [
 	"%s pressionou e recuperou a posse.",
 	"%s interceptou o passe e iniciou um novo ataque."
 ]
+const MEI_RECOVERY = [
+	"%s antecipou a jogada e iniciou a transição.",
+	"%s recuperou a bola e organizou o ataque.",
+	"%s roubou a posse e acelerou a jogada.",
+	"%s brigou pela bola e saiu jogando."
+]
+
+const CA_RECOVERY = [
+	"%s pressionou a saída de bola e recuperou a posse.",
+	"%s forçou o erro da defesa e ficou com a bola.",
+	"%s ganhou a disputa com o zagueiro e recuperou a posse.",
+	"%s pressionou no ataque e roubou a bola."
+]

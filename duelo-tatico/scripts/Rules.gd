@@ -6,17 +6,14 @@ extends RefCounted
 
 const BASE_BY_ZONE = [25, 35, 45, 55]
 
-
 static func opponent_difficulty_for(zone: int, level: int, stage: int) -> int:
-	var value = BASE_BY_ZONE[zone] + int(level * 1.0) + (stage - 1) * 4
-	return min(92, value)
-
+	var value: int = BASE_BY_ZONE[zone] + int(level * 1.0) + (stage - 1) * 4
+	return clampi(value, 0, 92)
 
 static func ai_attack_strength(level: int, stage: int) -> int:
-	return min(88, 25 + int(level * 0.8) + (stage - 1) * 3)
-
+	return clampi(25 + int(level * 0.8) + (stage - 1) * 3, 0, 88)
 
 static func success_chance(player_stat: float, difficulty: int, momentum: float, trait_bonus: int, min_pct: int = 8, max_pct: int = 92) -> int:
-	var diff = player_stat - difficulty + momentum + trait_bonus
-	var pct = 50 + diff * 0.6
-	return clampi(round(pct), min_pct, max_pct)
+	var diff: float = player_stat - difficulty + momentum + trait_bonus
+	var pct: float = 50.0 + diff * 0.6
+	return clampi(roundi(pct), min_pct, max_pct)

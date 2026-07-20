@@ -45,14 +45,16 @@ func _populate_lineup_options():
 		for roster_idx in GameState.candidates_for(role_idx):
 			var player = GameState.RosterData.ROSTER[roster_idx]
 			ob.add_item(
-				"%s | %s | PAS %d DRI %d SHO %d DEF %d"
+				"%s | %s | PAS %d DRI %d SHO %d INT %d TAC %d BLQ %d"
 				% [
 					player["name"],
 					GameState.trait_name(player["trait"]),
 					player["PAS"],
 					player["DRI"],
 					player["SHO"],
-					player["DEF"]
+					player["INT"],
+					player["TAC"],
+					player["BLQ"]
 				]
 			)
 			ob.set_item_metadata(ob.item_count - 1, roster_idx)
