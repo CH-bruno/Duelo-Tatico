@@ -155,7 +155,7 @@ func opponent_team_name() -> String:
 
 
 func ai_active_player() -> Dictionary:
-	return current_opponent_team()["squad"][ai_zone_idx]
+	return current_opponent_team()["squad"][ai_active_idx]
 
 
 # ---------- Dificuldade e chances (delega contas pro Rules) ----------
@@ -177,7 +177,21 @@ func opponent_difficulty() -> int:
 
 
 func ai_attack_strength() -> int:
-	return Rules.ai_attack_strength(level, difficulty_stage())
+	var p = ai_active_player()
+
+	var stat = 0
+
+	match ai_next_move:
+		AIMove.PASS:
+			stat = p["PAS"]
+		AIMove.DRIBBLE:
+			stat = p["DRI"]
+		AIMove.LONG_SHOT:
+			stat = p["SHO"] + 5
+		AIMove.SHOT:
+			stat = p["SHO"]
+
+	return stat + (difficulty_stage() - 1) * 2
 
 
 func chance_for(stat_name: String) -> int:
@@ -316,39 +330,48 @@ func attempt(action: String, target_idx: int = -1) -> void:
 	_advance_round()
 	state_changed.emit()
 
-func defender_for_zone(zone:int) -> int:
+func defender_for_attacker() -> int:
 
-	match zone:
-		0: return 3 # CA pressiona o ZAG
-		1: return 2 # MEI marca o VOL
-		2: return 1 # VOL marca o MEI
-		3: return 0 # ZAG marca o CA
+	match current_opponent_team()["squad"][ai_active_idx]["role"]:
+
+		"ZAG":
+			return 3
+
+		"VOL":
+			return 2
+
+		"MEI":
+			return 1
+
+		"CA":
+			return 0
 
 	return 0
 
 func recover_possession(defender_idx:int):
 
-	player_gets_ball()
+	possession = Possession.PLAYER
+	turn_state = TurnState.PLAYER_ATTACK
 
 	active_idx = defender_idx
 	zone_idx = defender_idx
 
-	match squad[defender_idx]["role"]:
+	ai_zone_idx = 0
+	ai_active_idx = 0
+	ai_momentum = 0
 
+	streak = 0
+	momentum_bonus = 0
+
+	match squad[defender_idx]["role"]:
 		"ZAG":
 			push_log(Narration.ZAG_RECOVERY.pick_random() % squad[defender_idx]["name"])
-
 		"VOL":
 			push_log(Narration.VOL_RECOVERY.pick_random() % squad[defender_idx]["name"])
-
 		"MEI":
 			push_log(Narration.MEI_RECOVERY.pick_random() % squad[defender_idx]["name"])
-
 		"CA":
 			push_log(Narration.CA_RECOVERY.pick_random() % squad[defender_idx]["name"])
-
-	possession = Possession.PLAYER
-	streak = 0
 
 
 func _kickoff():
@@ -362,13 +385,17 @@ func _advance_round() -> void:
 		SFX.play_whistle()
 		if goals > ai_goals:
 			push_log("Vitória por %d × %d!" % [goals, ai_goals])
-			push_log("Clique em 'Próxima Partida' para continuar a campanha.")
+			if campaign_stage >= MAX_CAMPAIGN_STAGE:
+				push_log("PARABÉNS! Você venceu a Grande Final e completou a Campanha!")
+				push_log("Clique em 'Menu' ou 'Nova Partida' para recomeçar.")
+			else:
+				push_log("Clique em 'Próxima Partida' para continuar a campanha.")
 		elif goals < ai_goals:
 			push_log("Derrota por %d × %d." % [goals, ai_goals])
-			push_log("Sua campanha terminou. Clique em 'Novo Jogo' para recomeçar.")
+			push_log("Sua campanha terminou. Clique em 'Nova Partida' para recomeçar.")
 		else:
 			push_log("Empate em %d × %d." % [goals, ai_goals])
-			push_log("Sua campanha terminou. Clique em 'Novo Jogo' para recomeçar.")
+			push_log("Sua campanha terminou. Clique em 'Nova Partida' para recomeçar.")
 
 
 # ---------- IA / defesa ----------
@@ -409,26 +436,44 @@ func ai_turn() -> void:
 
 
 func _choose_ai_move() -> void:
-	match ai_zone_idx:
-		0:
+
+	ai_active_idx = ai_zone_idx
+	var player = ai_active_player()
+
+	match player["role"]:
+
+		"ZAG":
 			ai_next_move = AIMove.PASS
-		1:
-			ai_next_move = AIMove.PASS if randi() % 100 < 70 else AIMove.DRIBBLE
-		2:
+
+		"VOL":
+			if randi() % 100 < 75:
+				ai_next_move = AIMove.PASS
+			else:
+				ai_next_move = AIMove.DRIBBLE
+
+		"MEI":
 			var r = randi() % 100
-			if r < 40:
+
+			if r < 35:
 				ai_next_move = AIMove.PASS
 			elif r < 80:
 				ai_next_move = AIMove.DRIBBLE
 			else:
 				ai_next_move = AIMove.LONG_SHOT
-		3:
-			ai_next_move = AIMove.SHOT
+
+		"CA":
+			if ai_zone_idx >= 2:
+				ai_next_move = AIMove.SHOT
+			else:
+				ai_next_move = AIMove.DRIBBLE
 
 
 func _resolve_ai_shot(bonus: int = 0) -> void:
 	var attack = ai_attack_strength()
-	var block_value = _defense_effectiveness("BLOCK")
+
+	var defender_idx = defender_for_attacker()
+	var block_value = _defense_effectiveness("BLOCK", defender_idx)
+
 	var diff = attack - block_value
 	var chance = clampi(round(50 + diff * 0.6) + bonus, 8, 92)
 
@@ -439,7 +484,7 @@ func _resolve_ai_shot(bonus: int = 0) -> void:
 		_kickoff()
 	else:
 		grant_xp(3)
-		recover_possession(0) # ZAG recupera a posse
+		recover_possession(defender_idx)
 
 
 func _reset_possession(reason: String) -> void:
@@ -451,11 +496,14 @@ func _reset_possession(reason: String) -> void:
 
 
 func defense_chance(action: String) -> int:
-	# Só calcula a chance, sem resolver nada — pra UI mostrar a % nos botões.
+	var defender_idx = defender_for_attacker()
+
 	var matches = _defense_matches_move(action, ai_next_move)
-	var effectiveness = _defense_effectiveness(action)
+	var effectiveness = _defense_effectiveness(action, defender_idx)
+
 	if not matches:
 		effectiveness = int(effectiveness * 0.5)
+
 	return clampi(round(50 + (effectiveness - ai_attack_strength()) * 0.6), 8, 92)
 
 
@@ -466,8 +514,7 @@ func defend(action: String) -> void:
 	var chance = defense_chance(action)
 	var success = randi_range(1, 100) <= chance
 
-	var defender_idx = defender_for_zone(ai_zone_idx)
-
+	var defender_idx = defender_for_attacker()
 	if success:
 		push_log("Sua defesa (%s) funcionou! (%d%% de chance)" % [_defense_label(action), chance])
 		recover_possession(defender_idx)
@@ -496,11 +543,8 @@ func _defense_label(defense_type: String) -> String:
 	return defense_type
 
 
-func _defense_effectiveness(defense_type: String) -> int:
-	# Zagueiro pesa mais que o Volante na defesa, igual já era antes.
-	var zag_stat = _stat_for_defense(squad[0], defense_type)
-	var vol_stat = _stat_for_defense(squad[1], defense_type)
-	return round(zag_stat * 0.7 + vol_stat * 0.3)
+func _defense_effectiveness(defense_type:String, defender_idx:int) -> int:
+	return _stat_for_defense(squad[defender_idx], defense_type)
 
 
 func _stat_for_defense(player: Dictionary, defense_type: String) -> int:
@@ -517,12 +561,15 @@ func _stat_for_defense(player: Dictionary, defense_type: String) -> int:
 
 func _ai_move_succeeds() -> void:
 	match ai_next_move:
+
 		AIMove.PASS, AIMove.DRIBBLE:
 			ai_zone_idx += 1
-			push_log("O adversário avançou com a jogada.")
-			ai_turn()  # continua o ataque — escolhe a próxima jogada
+			ai_active_idx = ai_zone_idx
+			push_log("%s avançou com a jogada." % ai_active_player()["name"])
+			ai_turn()
+
 		AIMove.LONG_SHOT, AIMove.SHOT:
-			_resolve_ai_shot()  # o chute em si ainda passa pelo Bloqueio (BLQ) do time
+			_resolve_ai_shot()
 
 
 # ---------- XP / progressão ----------
@@ -577,6 +624,10 @@ func next_match() -> void:
 	if not match_over or goals <= ai_goals:
 		return
 
+	# TRAVA DE SEGURANÇA: impede o avanço além da fase 5
+	if campaign_stage >= MAX_CAMPAIGN_STAGE:
+		return
+
 	campaign_stage += 1
 	log_messages.clear()
 	possession = Possession.PLAYER
@@ -592,7 +643,6 @@ func next_match() -> void:
 	push_log("A bola está com o %s." % active_player()["name"])
 	SFX.play_whistle()
 	state_changed.emit()
-
 
 func next_challenge_round() -> void:
 	if not match_over or goals <= ai_goals:
@@ -633,5 +683,5 @@ func reset_game() -> void:
 	campaign_stage = 1
 	challenge_wins = 0
 	log_messages = []
-	push_log("Novo jogo. A bola está com o %s." % active_player()["name"])
+	push_log("Nova partida iniciada. A bola está com o %s." % active_player()["name"])
 	state_changed.emit()

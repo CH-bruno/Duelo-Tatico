@@ -116,7 +116,8 @@ func refresh_ui():
 
 	_rebuild_pass_buttons()
 
-	var can_next_match = GameState.match_over and GameState.goals > GameState.ai_goals
+	# Modificado: O botão só aparece se não for a última fase da campanha
+	var can_next_match = GameState.match_over and GameState.goals > GameState.ai_goals and GameState.campaign_stage < GameState.MAX_CAMPAIGN_STAGE
 	next_match.visible = can_next_match
 
 	log_label.text = "\n".join(GameState.log_messages)
@@ -130,7 +131,9 @@ func refresh_ui():
 
 
 func _rebuild_pass_buttons():
+	# Modificado: remove da árvore de nós imediatamente antes de liberar a memória para evitar bugs visuais
 	for child in pass_container.get_children():
+		pass_container.remove_child(child)
 		child.queue_free()
 
 	if GameState.match_over:
