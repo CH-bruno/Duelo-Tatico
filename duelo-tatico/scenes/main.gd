@@ -57,23 +57,87 @@ func _ready():
 
 
 func refresh_ui():
-	var p = GameState.active_player()
-	var zone_name = GameState.ZONES[GameState.zone_idx]
+
+	var has_player_ball = GameState.possession == GameState.Possession.PLAYER
+
+	var raw_zone = GameState.zone_idx if has_player_ball else GameState.ai_zone_idx
+	var zone = clampi(raw_zone, 0, GameState.ZONES.size() - 1)
+	var zone_name = GameState.ZONES[zone]
 
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		zone_label.text = "Rodada %d/%d | Fase %d/%d | Zona: %s | Você %d × %d Adversário" % [
-			GameState.round_num, GameState.MAX_ROUNDS, GameState.campaign_stage, GameState.MAX_CAMPAIGN_STAGE, zone_name, GameState.goals, GameState.ai_goals
+			GameState.round_num,
+			GameState.MAX_ROUNDS,
+			GameState.campaign_stage,
+			GameState.MAX_CAMPAIGN_STAGE,
+			zone_name,
+			GameState.goals,
+			GameState.ai_goals
 		]
 	else:
 		zone_label.text = "Desafio | Sequência: %d (recorde: %d) | Rodada %d/%d | Zona: %s | Você %d × %d Adversário" % [
-			GameState.challenge_wins, GameState.challenge_best, GameState.round_num, GameState.MAX_ROUNDS, zone_name, GameState.goals, GameState.ai_goals
+			GameState.challenge_wins,
+			GameState.challenge_best,
+			GameState.round_num,
+			GameState.MAX_ROUNDS,
+			zone_name,
+			GameState.goals,
+			GameState.ai_goals
+		]
+		
+	if has_player_ball:
+
+		var attacker = GameState.active_player()
+
+		var defender := {}
+		match attacker["role"]:
+			"ZAG":
+				defender = GameState.current_opponent_team()["squad"][3] # CA
+			"VOL":
+				defender = GameState.current_opponent_team()["squad"][2] # MEI
+			"MEI":
+				defender = GameState.current_opponent_team()["squad"][1] # VOL
+			"CA":
+				defender = GameState.current_opponent_team()["squad"][0] # ZAG
+
+		stats_label.text = \
+		"⚽ Com a bola: %s (%s) | PAS %d DRI %d SHO %d\n" % [
+			attacker["name"],
+			attacker["role"],
+			attacker["PAS"],
+			attacker["DRI"],
+			attacker["SHO"]
+		] + \
+		"🛡 Defendendo: %s (%s) | INT %d TAC %d BLQ %d" % [
+			defender["name"],
+			defender["role"],
+			defender["INT"],
+			defender["TAC"],
+			defender["BLQ"]
 		]
 
-	stats_label.text = "Com a bola: %s (%s)   PAS %d  DRI %d  SHO %d  INT %d  TAC %d  BLQ %d   |   Nível %d   XP %d/%d" % [
-		p["name"], p["role"], p["PAS"], p["DRI"], p["SHO"], p["INT"], p["TAC"], p["BLQ"], GameState.level, GameState.xp, GameState.xp_to_next
-	]
+	else:
 
+		var attacker = GameState.ai_active_player()
+		var defender = GameState.squad[GameState.defender_for_attacker()]
+
+		stats_label.text = \
+		"⚽ Com a bola: %s (%s) | PAS %d DRI %d SHO %d\n" % [
+			attacker["name"],
+			attacker["role"],
+			attacker["PAS"],
+			attacker["DRI"],
+			attacker["SHO"]
+		] + \
+		"🛡 Defendendo: %s (%s) | INT %d TAC %d BLQ %d" % [
+			defender["name"],
+			defender["role"],
+			defender["INT"],
+			defender["TAC"],
+			defender["BLQ"]
+		]
 	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
+
 	attack_container.visible = not is_defending
 	pass_container.visible = not is_defending
 	defense_container.visible = is_defending
@@ -91,8 +155,9 @@ func refresh_ui():
 		tackle_button.modulate = color_for_chance(tac_chance)
 		block_button.modulate = color_for_chance(blq_chance)
 
-	var in_box = GameState.zone_idx == GameState.ZONES.size() - 1
-	var in_final_third = GameState.zone_idx == 2
+	var in_box = zone == GameState.ZONES.size() - 1
+	var in_final_third = zone == 2
+
 	sho_button.disabled = not in_box or GameState.match_over
 	dri_button.disabled = GameState.match_over
 	feint_button.disabled = GameState.match_over
@@ -111,24 +176,23 @@ func refresh_ui():
 
 	dri_button.modulate = color_for_chance(dri_chance)
 	feint_button.modulate = color_for_chance(feint_chance)
-	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color(1, 1, 1)
-	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color(1, 1, 1)
+	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color.WHITE
+	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color.WHITE
 
 	_rebuild_pass_buttons()
 
-	# Modificado: O botão só aparece se não for a última fase da campanha
 	var can_next_match = GameState.match_over and GameState.goals > GameState.ai_goals and GameState.campaign_stage < GameState.MAX_CAMPAIGN_STAGE
 	next_match.visible = can_next_match
 
 	log_label.text = "\n".join(GameState.log_messages)
 
 	if GameState.goals > _last_goals:
-		_flash_goal(Color(1, 0.85, 0.3, 1))  # dourado — seu gol
+		_flash_goal(Color(1, 0.85, 0.3, 1))
 	elif GameState.ai_goals > _last_ai_goals:
-		_flash_goal(Color(0.9, 0.3, 0.3, 1))  # vermelho — gol do adversário
+		_flash_goal(Color(0.9, 0.3, 0.3, 1))
+
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
-
 
 func _rebuild_pass_buttons():
 	# Modificado: remove da árvore de nós imediatamente antes de liberar a memória para evitar bugs visuais
