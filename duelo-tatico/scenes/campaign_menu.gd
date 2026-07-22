@@ -80,11 +80,12 @@ func update_ui():
 	stage_label.text = "Fase %d/%d" % [GameState.campaign_stage, GameState.MAX_CAMPAIGN_STAGE]
 
 	match GameState.campaign_stage:
-		1: enemy_label.text = "Adversário: Time de Bairro"
-		2: enemy_label.text = "Adversário: Time Regional"
-		3: enemy_label.text = "Adversário: Time Estadual"
-		4: enemy_label.text = "Adversário: Time Nacional"
-		5: enemy_label.text = "Adversário: Grande Final"
+			1: enemy_label.text = "Adversário: Time de Bairro"
+			2: enemy_label.text = "Adversário: Time Regional"
+			3: enemy_label.text = "Adversário: Time Estadual"
+			4: enemy_label.text = "Adversário: Time Nacional"
+			5: enemy_label.text = "Adversário: Grande Final"
+			_: enemy_label.text = "Campanha Concluída!"
 
 	stage_dots_label.text = _stage_dots()
 	squad_summary_label.text = _squad_summary()

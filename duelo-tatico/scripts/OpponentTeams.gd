@@ -1,4 +1,4 @@
-extends RefCounted
+extends RefCounted # Times adversários — um por fase da campanha. 
 
 const TEAMS = [
 
@@ -53,3 +53,11 @@ const TEAMS = [
 	},
 
 ]
+static func team_for_stage(stage: int) -> Dictionary:
+	var idx = clampi(stage - 1, 0, TEAMS.size() - 1)
+	return TEAMS[idx]
+
+
+static func team_for_challenge(wins: int) -> Dictionary:
+	var idx = wins % TEAMS.size()
+	return TEAMS[idx]
