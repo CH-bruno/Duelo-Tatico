@@ -1,0 +1,84 @@
+[gd_scene format=3 uid="uid://dp0ex2842vuvh"]
+
+[ext_resource type="Script" uid="uid://brn86befasjy3" path="res://scenes/MatchStats.gd" id="1_p4c1s"]
+
+[node name="MatchStats" type="Control" unique_id=37481572]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_p4c1s")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1551720116]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.08235294, 0.12941177, 0.16470589, 1)
+
+[node name="MarginContainer" type="MarginContainer" parent="." unique_id=1616313090]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -360.0
+offset_right = 320.0
+offset_bottom = 360.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 80
+theme_override_constants/margin_top = 80
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
+
+[node name="Panel" type="Panel" parent="MarginContainer" unique_id=1813360525]
+custom_minimum_size = Vector2(520, 600)
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="MarginContainer/Panel" unique_id=1751461179]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 25
+theme_override_constants/margin_top = 25
+theme_override_constants/margin_right = 25
+theme_override_constants/margin_bottom = 25
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MarginContainer/Panel/MarginContainer" unique_id=6993031]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="MarginContainer/Panel/MarginContainer/VBoxContainer" unique_id=1655010253]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "RESULTADO DA PARTIDA"
+horizontal_alignment = 1
+
+[node name="HSeparator" type="HSeparator" parent="MarginContainer/Panel/MarginContainer/VBoxContainer" unique_id=185532523]
+layout_mode = 2
+
+[node name="StatsGrid" type="GridContainer" parent="MarginContainer/Panel/MarginContainer/VBoxContainer" unique_id=1638833684]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 30
+theme_override_constants/v_separation = 8
+columns = 2
+
+[node name="HSeparator2" type="HSeparator" parent="MarginContainer/Panel/MarginContainer/VBoxContainer" unique_id=1234419563]
+layout_mode = 2
+
+[node name="CloseButton" type="Button" parent="MarginContainer/Panel/MarginContainer/VBoxContainer" unique_id=215984599]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Continuar"

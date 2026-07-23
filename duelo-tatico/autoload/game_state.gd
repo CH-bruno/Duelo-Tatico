@@ -27,7 +27,30 @@ var ai_goals = 0
 var turnovers = 0
 var streak = 0
 
-const MAX_ROUNDS = 30
+# Estatísticas da partida
+
+var passes_attempted = 0
+var passes_completed = 0
+
+var dribbles_attempted = 0
+var dribbles_completed = 0
+
+var feints_attempted = 0
+var feints_completed = 0
+
+var shots = 0
+var shots_on_target = 0
+
+var long_shots = 0
+var long_shots_on_target = 0
+
+var interceptions = 0
+var tackles = 0
+var blocks = 0
+
+var xp_gained_match = 0
+
+const MAX_ROUNDS = 5
 var round_num = 0
 var match_over = false
 
@@ -261,10 +284,12 @@ func attempt(action: String, target_idx: int = -1) -> void:
 		target = squad[target_idx]
 
 	if action == "SHO":
+		shots += 1
 		var succ_chance = chance_for("SHO")
 		var success = randi_range(1,100) <= succ_chance
 
 		if success:
+			shots_on_target += 1
 			goals += 1
 			streak += 1
 			grant_xp(15)
@@ -286,10 +311,12 @@ func attempt(action: String, target_idx: int = -1) -> void:
 		momentum_bonus = 0
 
 	elif action == "DRI":
+		dribbles_attempted += 1
 		var succ_chance = chance_for("DRI")
 		var success = randi_range(1,100) <= succ_chance
 
 		if success:
+			dribbles_completed += 1
 			grant_xp(6)
 			streak += 1
 
@@ -319,9 +346,11 @@ func attempt(action: String, target_idx: int = -1) -> void:
 
 			momentum_bonus = 0
 	elif action == "FEINT":
+		feints_attempted += 1
 		var succ_chance = feint_chance()
 		var success = randi_range(1, 100) <= succ_chance
 		if success:
+			feints_completed += 1
 			grant_xp(9)
 			streak += 1
 			push_log(Narration.FEINT.pick_random() % [passer["name"], passer["role"]])
@@ -336,10 +365,12 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			momentum_bonus = 0
 
 	elif action == "LONG_SHO":
+		long_shots += 1
 		var succ_chance = long_shot_chance()
 		var success = randi_range(1,100) <= succ_chance
 
 		if success:
+			long_shots_on_target += 1
 			goals += 1
 			streak += 1
 			grant_xp(20)
@@ -360,9 +391,11 @@ func attempt(action: String, target_idx: int = -1) -> void:
 		momentum_bonus = 0
 
 	else:  # PASS
+		passes_attempted += 1
 		var succ_chance = pass_chance_to(target_idx)
 		var success = randi_range(1, 100) <= succ_chance
 		if success:
+			passes_completed += 1
 			grant_xp(4)
 			streak += 1
 			push_log(Narration.PASS_SUCCESS.pick_random() % [passer["name"], passer["role"], target["name"], target["role"]])
@@ -574,6 +607,13 @@ func defend(action: String) -> void:
 	var defender_idx = defender_for_attacker()
 
 	if success:
+		match action:
+			"INTERCEPT":
+				interceptions += 1
+			"TACKLE":
+				tackles += 1
+			"BLOCK":
+				blocks += 1
 		push_log("Sua defesa (%s) funcionou! (%d%% de chance)" % [_defense_label(action), chance])
 		recover_possession(defender_idx)
 	else:
@@ -645,6 +685,7 @@ func _ai_move_succeeds() -> void:
 # ---------- XP / progressão ----------
 
 func grant_xp(amount: int) -> void:
+	xp_gained_match += amount
 	xp += amount
 	while xp >= xp_to_next:
 		xp -= xp_to_next
@@ -691,7 +732,59 @@ func push_log(text: String) -> void:
 func _log_ai(text: String) -> void:
 	push_log("(Adversário) %s" % text)
 
+func reset_match_stats() -> void:
+	passes_attempted = 0
+	passes_completed = 0
 
+	dribbles_attempted = 0
+	dribbles_completed = 0
+
+	feints_attempted = 0
+	feints_completed = 0
+
+	shots = 0
+	shots_on_target = 0
+
+	long_shots = 0
+	long_shots_on_target = 0
+
+	interceptions = 0
+	tackles = 0
+	blocks = 0
+
+	xp_gained_match = 0
+
+
+func match_stats() -> Dictionary:
+	return {
+		"passes_attempted": passes_attempted,
+		"passes_completed": passes_completed,
+
+		"dribbles_attempted": dribbles_attempted,
+		"dribbles_completed": dribbles_completed,
+
+		"feints_attempted": feints_attempted,
+		"feints_completed": feints_completed,
+
+		"shots": shots,
+		"shots_on_target": shots_on_target,
+
+		"long_shots": long_shots,
+		"long_shots_on_target": long_shots_on_target,
+
+		"interceptions": interceptions,
+		"tackles": tackles,
+		"blocks": blocks,
+
+		"xp": xp_gained_match,
+
+		"goals": goals,
+		"goals_ai": ai_goals,
+
+		"turnovers": turnovers,
+
+		"rounds": round_num
+	}
 # ---------- Fluxo entre partidas ----------
 
 func next_match() -> void:
@@ -702,6 +795,7 @@ func next_match() -> void:
 
 	campaign_stage += 1
 	log_messages.clear()
+	reset_match_stats()
 	possession = Possession.PLAYER
 	_kickoff()
 	goals = 0
@@ -724,6 +818,7 @@ func next_challenge_round() -> void:
 	challenge_wins += 1
 	challenge_best = max(challenge_best, challenge_wins)
 	log_messages.clear()
+	reset_match_stats()
 	possession = Possession.PLAYER
 
 	_kickoff()
@@ -756,5 +851,6 @@ func reset_game() -> void:
 	campaign_stage = 1
 	challenge_wins = 0
 	log_messages = []
+	reset_match_stats()
 	push_log("Nova partida iniciada. A bola está com o %s." % active_player()["name"])
 	state_changed.emit()
