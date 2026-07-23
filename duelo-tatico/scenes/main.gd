@@ -22,13 +22,21 @@ extends Control
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
+# Instância da cena de estatísticas para overlay
+const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
+
 var _last_goals = 0
 var _last_ai_goals = 0
 
+# Flag de controle para abrir o popup de estatísticas apenas uma vez
+var stats_opened := false
 
 func _ready():
 	theme = AppTheme.build()
 	GameState.state_changed.connect(refresh_ui)
+	
+	# Garante que começa resetado ao entrar na cena
+	stats_opened = false
 
 	dri_button.pressed.connect(func(): GameState.attempt("DRI"))
 	feint_button.pressed.connect(func(): GameState.attempt("FEINT"))
@@ -57,7 +65,6 @@ func _ready():
 
 
 func refresh_ui():
-
 	var has_player_ball = GameState.possession == GameState.Possession.PLAYER
 
 	var raw_zone = GameState.zone_idx if has_player_ball else GameState.ai_zone_idx
@@ -86,56 +93,33 @@ func refresh_ui():
 		]
 		
 	if has_player_ball:
-
 		var attacker = GameState.active_player()
-
 		var defender := {}
 		match attacker["role"]:
-			"ZAG":
-				defender = GameState.current_opponent_team()["squad"][3] # CA
-			"VOL":
-				defender = GameState.current_opponent_team()["squad"][2] # MEI
-			"MEI":
-				defender = GameState.current_opponent_team()["squad"][1] # VOL
-			"CA":
-				defender = GameState.current_opponent_team()["squad"][0] # ZAG
+			"ZAG": defender = GameState.current_opponent_team()["squad"][3] # CA
+			"VOL": defender = GameState.current_opponent_team()["squad"][2] # MEI
+			"MEI": defender = GameState.current_opponent_team()["squad"][1] # VOL
+			"CA":  defender = GameState.current_opponent_team()["squad"][0] # ZAG
 
 		stats_label.text = \
 		"⚽ Com a bola: %s (%s) | PAS %d DRI %d SHO %d\n" % [
-			attacker["name"],
-			attacker["role"],
-			attacker["PAS"],
-			attacker["DRI"],
-			attacker["SHO"]
+			attacker["name"], attacker["role"], attacker["PAS"], attacker["DRI"], attacker["SHO"]
 		] + \
 		"🛡 Defendendo: %s (%s) | INT %d TAC %d BLQ %d" % [
-			defender["name"],
-			defender["role"],
-			defender["INT"],
-			defender["TAC"],
-			defender["BLQ"]
+			defender["name"], defender["role"], defender["INT"], defender["TAC"], defender["BLQ"]
 		]
-
 	else:
-
 		var attacker = GameState.ai_active_player()
 		var defender = GameState.squad[GameState.defender_for_attacker()]
 
 		stats_label.text = \
 		"⚽ Com a bola: %s (%s) | PAS %d DRI %d SHO %d\n" % [
-			attacker["name"],
-			attacker["role"],
-			attacker["PAS"],
-			attacker["DRI"],
-			attacker["SHO"]
+			attacker["name"], attacker["role"], attacker["PAS"], attacker["DRI"], attacker["SHO"]
 		] + \
 		"🛡 Defendendo: %s (%s) | INT %d TAC %d BLQ %d" % [
-			defender["name"],
-			defender["role"],
-			defender["INT"],
-			defender["TAC"],
-			defender["BLQ"]
+			defender["name"], defender["role"], defender["INT"], defender["TAC"], defender["BLQ"]
 		]
+
 	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
 
 	attack_container.visible = not is_defending
@@ -194,8 +178,19 @@ func refresh_ui():
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
 
+	# --- DETECÇÃO DE FIM DE PARTIDA (OVERLAY) ---
+	if GameState.match_over and not stats_opened:
+		stats_opened = true
+		show_match_stats()
+
+
+func show_match_stats():
+	# Instancia o painel por cima do jogo sem trocar de cena
+	var stats_overlay = MatchStatsScene.instantiate()
+	add_child(stats_overlay)
+
+
 func _rebuild_pass_buttons():
-	# Modificado: remove da árvore de nós imediatamente antes de liberar a memória para evitar bugs visuais
 	for child in pass_container.get_children():
 		pass_container.remove_child(child)
 		child.queue_free()
@@ -211,7 +206,7 @@ func _rebuild_pass_buttons():
 		var btn = Button.new()
 		btn.text = "Passar p/ %s (%d%%)" % [teammate["name"], pass_chance]
 		btn.modulate = color_for_chance(pass_chance)
-		var target_idx = i  # cópia local — evita o problema de "closure" pegando o valor errado
+		var target_idx = i
 		btn.pressed.connect(func(): GameState.attempt("PASS", target_idx))
 		pass_container.add_child(btn)
 		_add_press_feedback(btn)
@@ -230,7 +225,6 @@ func _flash_goal(color: Color) -> void:
 
 
 func _add_press_feedback(btn: Button) -> void:
-	# Faz o botão "encolher" ao ser pressionado e voltar ao soltar — dá feedback tátil.
 	btn.pivot_offset = btn.size / 2.0
 	btn.resized.connect(func(): btn.pivot_offset = btn.size / 2.0)
 	btn.button_down.connect(func():
@@ -244,16 +238,18 @@ func _add_press_feedback(btn: Button) -> void:
 
 
 func _on_next_match_pressed():
+	stats_opened = false # Reseta para a próxima partida
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		GameState.next_match()
 		get_tree().change_scene_to_file("res://scenes/campaign_menu.tscn")
 	else:
-		GameState.next_challenge_round()  # Desafio: continua na mesma tela, sem escalação
+		GameState.next_challenge_round()
 
 
 func _on_new_game_pressed():
+	stats_opened = false # Reseta ao reiniciar
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		GameState.reset_game()
 		get_tree().change_scene_to_file("res://scenes/campaign_menu.tscn")
 	else:
-		GameState.reset_game()  # Desafio: reinicia a sequência ali mesmo
+		GameState.reset_game()
