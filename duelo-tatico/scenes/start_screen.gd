@@ -1,5 +1,5 @@
 extends Control
-# StartScreen.gd — Menu Principal com Moldura Corrigida e Fundo Animado.
+# StartScreen.gd — Menu Principal com Moldura e Fundo Animado do Gramado.
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
@@ -22,15 +22,8 @@ func _ready():
 	challenge_button.pressed.connect(_challenge)
 	quit_button.pressed.connect(func(): get_tree().quit())
 
-	_remove_default_backgrounds()
 	_apply_card_frame()
 	_apply_button_styles()
-
-
-func _remove_default_backgrounds():
-	for child in get_children():
-		if child is ColorRect and child.name != "CenterContainer":
-			child.visible = false
 
 
 func _process(delta: float) -> void:
@@ -69,23 +62,20 @@ func _draw():
 	draw_circle(current_ball_pos, 6, Color(1.0, 1.0, 0.85))
 
 
-# Aplica o fundo/moldura no VBoxContainer de forma limpa sem criar nós extras soltos
 func _apply_card_frame():
 	var vbox = $CenterContainer/VBoxContainer
-	if vbox:
+	if vbox and not $CenterContainer.has_node("MenuCardPanel"):
 		var card_style = StyleBoxFlat.new()
-		card_style.bg_color = Color(0.05, 0.09, 0.06, 0.85) # Fundo verde escuro transparente
-		card_style.border_color = Color(0.85, 0.65, 0.25, 0.7) # Borda Dourada
+		card_style.bg_color = Color(0.05, 0.09, 0.06, 0.85)
+		card_style.border_color = Color(0.85, 0.65, 0.25, 0.7)
 		card_style.set_border_width_all(1)
 		card_style.set_corner_radius_all(12)
 		card_style.set_content_margin_all(20)
 
-		# Aplica o estilo diretamente como o fundo do container dos botões
 		var panel = PanelContainer.new()
 		panel.name = "MenuCardPanel"
 		panel.add_theme_stylebox_override("panel", card_style)
 		
-		# Move o vbox para dentro do novo painel
 		var center_container = $CenterContainer
 		center_container.remove_child(vbox)
 		panel.add_child(vbox)
