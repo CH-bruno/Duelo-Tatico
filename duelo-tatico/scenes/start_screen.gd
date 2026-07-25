@@ -2,21 +2,34 @@ extends Control
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
-@onready var campaign_button = $CenterContainer/VBoxContainer/CampaignButton
+@onready var continue_button = $CenterContainer/VBoxContainer/ContinueButton
 @onready var challenge_button = $CenterContainer/VBoxContainer/ChallengeButton
 @onready var quit_button = $CenterContainer/VBoxContainer/QuitButton
-
+@onready var campaign_button = $CenterContainer/VBoxContainer/CampaignButton
 
 func _ready():
 	theme = AppTheme.build()
-
+	SFX.play_music("res://audio/music_menu.mp3")
+	continue_button.visible = SaveSystem.has_save()
+	continue_button.pressed.connect(_on_continue_pressed)
 	campaign_button.pressed.connect(_campaign)
 	challenge_button.pressed.connect(_challenge)
 	quit_button.pressed.connect(func(): get_tree().quit())
 
 	quit_button.theme_type_variation = "GhostButton"  # ação secundária, menos peso visual
+	
+func _on_continue_pressed():
 
+	if SaveSystem.load_game():
+		get_tree().change_scene_to_file(
+			"res://scenes/campaign_menu.tscn"
+		)
 
+func _on_new_game_pressed():
+	SaveSystem.delete_save()
+	GameState.reset_game()
+	get_tree().change_scene_to_file("res://scenes/campaign_menu.tscn")
+	
 func _campaign():
 	GameState.game_mode = GameState.GameMode.CAMPAIGN
 	GameState.reset_game()

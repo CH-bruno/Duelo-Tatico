@@ -19,6 +19,9 @@ config/icon="res://icon.svg"
 
 GameState="*uid://b2lpd2b1c1ad4"
 SFX="*uid://dcnajk8wfsb3s"
+AIOpponent="*uid://ctsrveuoti7ir"
+Stats="*uid://bl2i2yjxnkb8d"
+SaveSystem="*uid://fp4oktkl213j"
 
 [display]
 

@@ -33,6 +33,8 @@ var stats_opened := false
 
 func _ready():
 	theme = AppTheme.build()
+	SFX.play_whistle()
+	SFX.play_music("res://audio/music_match.mp3")
 	GameState.state_changed.connect(refresh_ui)
 	
 	# Garante que começa resetado ao entrar na cena
@@ -44,7 +46,7 @@ func _ready():
 	long_shot_button.pressed.connect(func(): GameState.attempt("LONG_SHO"))
 	reset_button.pressed.connect(_on_new_game_pressed)
 	next_match.pressed.connect(_on_next_match_pressed)
-	menu_button.pressed.connect(func(): get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
+	menu_button.pressed.connect(func():get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
 	menu_button.theme_type_variation = "GhostButton"
 
 	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
