@@ -18,11 +18,12 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 10
 
 [node name="TitleLabel" type="Label" parent="VBoxContainer" unique_id=327309213]
 layout_mode = 2
 theme_override_font_sizes/font_size = 32
-text = "Duelo Tático
+text = "Modo Campanha
 "
 horizontal_alignment = 1
 

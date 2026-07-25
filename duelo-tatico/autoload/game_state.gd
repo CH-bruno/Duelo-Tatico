@@ -18,11 +18,15 @@ const MAX_ROUNDS = 30
 var starters = [0, 2, 4, 6]
 var squad = []
 
+# Dicionário que armazena a stamina de cada jogador no elenco { roster_idx: float }
+var player_stamina: Dictionary = {}
+
 var zone_idx = 0
 var active_idx = 0
 
 var level = 1
 var xp = 0
+var pending_xp = 0 # 👈 XP acumulado na partida que só é aplicado ao final!
 var xp_to_next = 20
 
 var goals = 0
@@ -51,27 +55,40 @@ var possession = Possession.PLAYER
 enum TurnState { PLAYER_ATTACK, PLAYER_DEFENSE }
 var turn_state = TurnState.PLAYER_ATTACK
 
-# AIMove fica aqui porque ai_next_move também fica aqui — é estado
-# compartilhado da partida, não uma decisão em si (as decisões estão
-# em AIOpponent.gd).
 enum AIMove { PASS, DRIBBLE, LONG_SHOT, SHOT }
 var ai_next_move = AIMove.PASS
 
-# ai_zone_idx segue a MESMA convenção do zone_idx: 0 = saída de bola
-# (ZAG deles), 3 = finalização (CA deles). ai_active_idx é sempre igual
-# a ai_zone_idx — sem espelhar. O espelhamento (3 - zona) só entra
-# quando é preciso saber quem do OUTRO time está numa zona.
 var ai_zone_idx = 0
 var ai_active_idx = 0
 var ai_momentum = 0
 
 
 func _ready():
+	init_stamina()
 	_apply_lineup()
 	push_log("Apito inicial. A bola está com o %s." % active_player()["name"])
 
 
-# ---------- Elenco / escalação ----------
+# ---------- Elenco / Escalação e Stamina ----------
+
+func init_stamina() -> void:
+	player_stamina.clear()
+	for i in range(RosterData.ROSTER.size()):
+		player_stamina[i] = 100.0
+
+
+func apply_match_fatigue() -> void:
+	for i in range(RosterData.ROSTER.size()):
+		if not player_stamina.has(i):
+			player_stamina[i] = 100.0
+
+		if i in starters:
+			# Titulares gastam 20% de energia por partida
+			player_stamina[i] = maxf(30.0, player_stamina[i] - 20.0)
+		else:
+			# Reservas recuperam 30% de energia descansando no banco
+			player_stamina[i] = minf(100.0, player_stamina[i] + 30.0)
+
 
 func candidates_for(role_idx: int) -> Array:
 	return RosterData.candidates_for(role_idx)
@@ -96,14 +113,24 @@ func set_lineup(new_starters: Array) -> void:
 func _apply_lineup() -> void:
 	var growth_levels = level - 1
 	squad = []
+	
 	for idx in starters:
 		var p = RosterData.ROSTER[idx].duplicate()
-		p["PAS"] = min(95, p["PAS"] + 2 * growth_levels)
-		p["DRI"] = min(95, p["DRI"] + 2 * growth_levels)
-		p["SHO"] = min(95, p["SHO"] + 3 * growth_levels)
-		p["INT"] = min(95, p["INT"] + 2 * growth_levels)
-		p["TAC"] = min(95, p["TAC"] + 2 * growth_levels)
-		p["BLQ"] = min(95, p["BLQ"] + 2 * growth_levels)
+		var stamina_val = player_stamina.get(idx, 100.0)
+		
+		# Multiplicador de desempenho baseado no cansaço
+		var stamina_mult = 1.0
+		if stamina_val < 50.0:
+			stamina_mult = 0.80 # -20% se tiver abaixo de 50% de stamina
+		elif stamina_val < 75.0:
+			stamina_mult = 0.90 # -10% se tiver abaixo de 75% de stamina
+		
+		p["PAS"] = min(95, int(round((p["PAS"] + 2 * growth_levels) * stamina_mult)))
+		p["DRI"] = min(95, int(round((p["DRI"] + 2 * growth_levels) * stamina_mult)))
+		p["SHO"] = min(95, int(round((p["SHO"] + 3 * growth_levels) * stamina_mult)))
+		p["INT"] = min(95, int(round((p["INT"] + 2 * growth_levels) * stamina_mult)))
+		p["TAC"] = min(95, int(round((p["TAC"] + 2 * growth_levels) * stamina_mult)))
+		p["BLQ"] = min(95, int(round((p["BLQ"] + 2 * growth_levels) * stamina_mult)))
 		squad.append(p)
 
 
@@ -144,7 +171,7 @@ func opponent_player_at(zone: int) -> Dictionary:
 	return current_opponent_team()["squad"][zone]
 
 
-# ---------- Quem marca quem (espelhado: zona i marcada pela zona 3-i) ----------
+# ---------- Quem marca quem ----------
 
 func attacker_for_zone(zone: int) -> int:
 	return 3 - zone
@@ -168,7 +195,7 @@ func _opponent_marker_for(my_zone: int) -> Dictionary:
 	return current_opponent_team()["squad"][attacker_for_zone(my_zone)]
 
 
-# ---------- Dificuldade e chances (suas ações) ----------
+# ---------- Dificuldade e chances ----------
 
 func difficulty_stage() -> int:
 	if game_mode == GameMode.CHALLENGE:
@@ -260,7 +287,6 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			grant_xp(2)
 			push_log(Narration.GOAL_FAIL.pick_random() % [passer["name"], passer["role"]])
 
-		# Chute (acertando ou errando) sempre reinicia com o Zagueiro adversário.
 		_kickoff(false)
 		momentum_bonus = 0
 
@@ -275,7 +301,6 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			streak += 1
 			push_log(Narration.DRIBBLE.pick_random() % [passer["name"], passer["role"]])
 			SFX.play_dribble()
-			# Não muda de zona — só melhora a jogada seguinte (momentum).
 			momentum_bonus = 22
 		else:
 			grant_xp(1)
@@ -298,8 +323,6 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			momentum_bonus = 30
 		else:
 			grant_xp(1)
-			# A recuperação (turnover + som) já é feita dentro de reset_possession —
-			# nasce onde a finta aconteceu.
 			AIOpponent.reset_possession(Narration.FEINT_FAIL.pick_random() % [passer["name"], passer["role"]], zone_idx)
 			momentum_bonus = 0
 
@@ -323,7 +346,7 @@ func attempt(action: String, target_idx: int = -1) -> void:
 		_kickoff(false)
 		momentum_bonus = 0
 
-	else:  # PASS
+	else: # PASS
 		Stats.passes_attempted += 1
 		var succ_chance = pass_chance_to(target_idx)
 		var success = randi_range(1, 100) <= succ_chance
@@ -362,14 +385,10 @@ func recover_possession(defender_idx: int) -> void:
 
 	var defender = squad[defender_idx]
 	match defender["role"]:
-		"ZAG":
-			push_log(Narration.ZAG_RECOVERY.pick_random() % [defender["name"], defender["role"]])
-		"VOL":
-			push_log(Narration.VOL_RECOVERY.pick_random() % [defender["name"], defender["role"]])
-		"MEI":
-			push_log(Narration.MEI_RECOVERY.pick_random() % [defender["name"], defender["role"]])
-		"CA":
-			push_log(Narration.CA_RECOVERY.pick_random() % [defender["name"], defender["role"]])
+		"ZAG": push_log(Narration.ZAG_RECOVERY.pick_random() % [defender["name"], defender["role"]])
+		"VOL": push_log(Narration.VOL_RECOVERY.pick_random() % [defender["name"], defender["role"]])
+		"MEI": push_log(Narration.MEI_RECOVERY.pick_random() % [defender["name"], defender["role"]])
+		"CA":  push_log(Narration.CA_RECOVERY.pick_random() % [defender["name"], defender["role"]])
 
 
 func _kickoff(start_with_player: bool = true) -> void:
@@ -395,6 +414,10 @@ func _advance_round() -> void:
 	if round_num >= MAX_ROUNDS:
 		match_over = true
 		SFX.play_whistle()
+		
+		# Aplica o XP pendente da partida agora que o apito final foi dado!
+		_process_pending_xp()
+		
 		if goals > ai_goals:
 			push_log("Vitória por %d × %d!" % [goals, ai_goals])
 			if campaign_stage >= MAX_CAMPAIGN_STAGE:
@@ -410,7 +433,7 @@ func _advance_round() -> void:
 			push_log("Sua campanha terminou. Clique em 'Nova Partida' para recomeçar.")
 
 
-# ---------- IA / defesa (delega pro AIOpponent) ----------
+# ---------- IA / Defesa ----------
 
 func ai_gets_ball(player_zone: int = 0) -> void:
 	AIOpponent.gets_ball(player_zone)
@@ -426,47 +449,45 @@ func defense_chance(action: String) -> int:
 
 func defend(action: String) -> void:
 	AIOpponent.defend(action)
+# Adicione esta sinalização para a UI reagir a eventos especiais
+signal match_event_triggered(event_name: String, details: Dictionary)
 
+# Adicione no atalho de erro de desarme ou tentativa de ação:
+func trigger_foul_check(is_player: bool) -> bool:
+	# 20% de chance de falta ao errar desarme agressivo
+	if randf() < 0.20:
+		var card_given = randf() < 0.35 # 35% de chance de ser Amarelo
+		if card_given:
+			push_log("🟨 CARTÃO AMARELO! Entrada dura no lance.")
+			SFX.play_whistle()
+			match_event_triggered.emit("YELLOW_CARD", {})
+		else:
+			push_log("⚠️ FALTA! O juiz paralisa a jogada.")
+			SFX.play_whistle()
+			match_event_triggered.emit("FOUL", {})
+		return true
+	return false
 
-# ---------- XP / progressão ----------
+# ---------- XP / Progressão ----------
 
 func grant_xp(amount: int) -> void:
+	# Guarda o XP obtido durante a partida sem subir os atributos no meio do jogo
 	Stats.xp_gained_match += amount
-	xp += amount
+	pending_xp += amount
+
+
+func _process_pending_xp() -> void:
+	xp += pending_xp
+	pending_xp = 0
+	
+	var initial_level = level
 	while xp >= xp_to_next:
 		xp -= xp_to_next
 		level += 1
 		xp_to_next = int(round(xp_to_next * 1.35))
-		for player in squad:
-			match player["role"]:
-				"ZAG":
-					player["PAS"] = min(95, player["PAS"] + 1)
-					player["DRI"] = min(95, player["DRI"] + 1)
-					player["SHO"] = min(95, player["SHO"] + 1)
-					player["INT"] = min(95, player["INT"] + 2)
-					player["TAC"] = min(95, player["TAC"] + 2)
-					player["BLQ"] = min(95, player["BLQ"] + 3)
-				"VOL":
-					player["PAS"] = min(95, player["PAS"] + 2)
-					player["DRI"] = min(95, player["DRI"] + 2)
-					player["SHO"] = min(95, player["SHO"] + 1)
-					player["INT"] = min(95, player["INT"] + 2)
-					player["TAC"] = min(95, player["TAC"] + 3)
-					player["BLQ"] = min(95, player["BLQ"] + 1)
-				"MEI":
-					player["PAS"] = min(95, player["PAS"] + 3)
-					player["DRI"] = min(95, player["DRI"] + 2)
-					player["SHO"] = min(95, player["SHO"] + 2)
-					player["INT"] = min(95, player["INT"] + 1)
-					player["TAC"] = min(95, player["TAC"] + 1)
-					player["BLQ"] = min(95, player["BLQ"] + 1)
-				"CA":
-					player["PAS"] = min(95, player["PAS"] + 1)
-					player["DRI"] = min(95, player["DRI"] + 2)
-					player["SHO"] = min(95, player["SHO"] + 3)
-					player["INT"] = min(95, player["INT"] + 1)
-					player["TAC"] = min(95, player["TAC"] + 1)
-					player["BLQ"] = min(95, player["BLQ"] + 1)
+		
+	if level > initial_level:
+		push_log("🎉 Seu time subiu para o Nível %d! Atributos evoluídos." % level)
 
 
 func push_log(text: String) -> void:
@@ -483,13 +504,16 @@ func match_stats() -> Dictionary:
 	return Stats.to_dict()
 
 
-# ---------- Fluxo entre partidas ----------
+# ---------- Fluxo entre Partidas ----------
 
 func next_match() -> void:
 	if not match_over or goals <= ai_goals:
 		return
 	if campaign_stage >= MAX_CAMPAIGN_STAGE:
 		return
+
+	apply_match_fatigue()
+	_apply_lineup() # 👈 Atualiza o squad já com os atributos evoluídos e cansaço aplicado
 
 	campaign_stage += 1
 	log_messages.clear()
@@ -514,6 +538,9 @@ func next_challenge_round() -> void:
 	if not match_over or goals <= ai_goals:
 		return
 
+	apply_match_fatigue()
+	_apply_lineup()
+
 	challenge_wins += 1
 	challenge_best = max(challenge_best, challenge_wins)
 	log_messages.clear()
@@ -536,8 +563,10 @@ func next_challenge_round() -> void:
 func reset_game() -> void:
 	level = 1
 	xp = 0
+	pending_xp = 0
 	xp_to_next = 20
 	starters = [0, 2, 4, 6]
+	init_stamina()
 	_apply_lineup()
 	possession = Possession.PLAYER
 	_kickoff()
