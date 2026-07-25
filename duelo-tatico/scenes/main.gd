@@ -1,6 +1,6 @@
 extends Control
-# Script da cena principal. Conecta os botões ao GameState
-# e atualiza os textos toda vez que o estado muda.
+# Script da cena principal do jogo.
+# Conecta as ações ao GameState, gerencia o turno e atualiza a UI.
 
 @onready var zone_label: Label = $VBoxContainer/ZoneLabel
 @onready var stats_label: Label = $VBoxContainer/StatsLabel
@@ -10,9 +10,8 @@ extends Control
 @onready var feint_button: Button = $VBoxContainer/HBoxContainer/FeintButton
 @onready var sho_button: Button = $VBoxContainer/HBoxContainer/ShoButton
 @onready var long_shot_button: Button = $VBoxContainer/HBoxContainer/LongShotButton
-@onready var reset_button: Button = $VBoxContainer/ResetButton
 @onready var next_match: Button = $VBoxContainer/NextMatchButton
-@onready var menu_button: Button = $VBoxContainer/MenuButton
+@onready var options_button: Button = $VBoxContainer/OptionsButton
 @onready var goal_flash: ColorRect = $GoalFlash
 @onready var defense_container: HBoxContainer = $VBoxContainer/DefenseContainer
 @onready var intercept_button: Button = $VBoxContainer/DefenseContainer/InterceptButton
@@ -21,50 +20,69 @@ extends Control
 @onready var attack_container: HBoxContainer = $VBoxContainer/HBoxContainer
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
-
-# Instância da cena de estatísticas para overlay
+const OptionsMenuScene = preload("res://scenes/OptionsMenu.tscn")
 const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
 
 var _last_goals = 0
 var _last_ai_goals = 0
-
-# Flag de controle para abrir o popup de estatísticas apenas uma vez
 var stats_opened := false
+
 
 func _ready():
 	theme = AppTheme.build()
-	SFX.play_whistle()
 	SFX.play_music("res://audio/music_match.mp3")
-	GameState.state_changed.connect(refresh_ui)
+	SFX.play_whistle() # Toca o apito inicial do jogo
 	
-	# Garante que começa resetado ao entrar na cena
-	stats_opened = false
+	GameState.state_changed.connect(refresh_ui)
 
 	dri_button.pressed.connect(func(): GameState.attempt("DRI"))
 	feint_button.pressed.connect(func(): GameState.attempt("FEINT"))
 	sho_button.pressed.connect(func(): GameState.attempt("SHO"))
 	long_shot_button.pressed.connect(func(): GameState.attempt("LONG_SHO"))
-	reset_button.pressed.connect(_on_new_game_pressed)
 	next_match.pressed.connect(_on_next_match_pressed)
-	menu_button.pressed.connect(func():get_tree().change_scene_to_file("res://scenes/start_screen.tscn"))
-	menu_button.theme_type_variation = "GhostButton"
+	options_button.pressed.connect(_on_options_pressed)
 
 	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
 	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
 	block_button.pressed.connect(func(): GameState.defend("BLOCK"))
 
-	for btn in [dri_button, feint_button, sho_button, long_shot_button, reset_button, next_match, menu_button, intercept_button, tackle_button, block_button]:
+	for btn in [dri_button, feint_button, sho_button, long_shot_button, next_match, options_button, intercept_button, tackle_button, block_button]:
 		_add_press_feedback(btn)
 
 	goal_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	goal_flash.modulate.a = 0.0
 	goal_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	_setup_ui_styles()
+
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
 
 	refresh_ui()
 
+
+# Ajustes de estilo aplicados diretamente via código para não precisar mexer no editor
+func _setup_ui_styles():
+	if options_button:
+		options_button.text = "⚙️ Opções"
+		options_button.theme_type_variation = "GhostButton"
+		options_button.custom_minimum_size = Vector2(110, 30)
+		options_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+	# 2. Painel do Log AUMENTADO com visual de caixa de narração
+	if log_label:
+		log_label.custom_minimum_size = Vector2(0, 100) # 👈 Altura ajustada para 4 linhas
+		log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		
+		var log_box = StyleBoxFlat.new()
+		log_box.bg_color = Color(0.06, 0.10, 0.07, 0.92) # Verde escuro
+		log_box.border_color = Color(0.85, 0.65, 0.25, 0.6) # Dourado sutil
+		log_box.set_border_width_all(1)
+		log_box.set_corner_radius_all(8)
+		log_box.set_content_margin_all(10)
+		
+		log_label.add_theme_stylebox_override("normal", log_box)
+		log_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.90))
 
 func refresh_ui():
 	var has_player_ball = GameState.possession == GameState.Possession.PLAYER
@@ -73,8 +91,9 @@ func refresh_ui():
 	var zone = clampi(raw_zone, 0, GameState.ZONES.size() - 1)
 	var zone_name = GameState.ZONES[zone]
 
+	# 1. TÍTULO E PLACAR SUPERIOR
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
-		zone_label.text = "Rodada %d/%d | Fase %d/%d | Zona: %s | Você %d × %d Adversário" % [
+		zone_label.text = "Rodada %d/%d  │  Fase %d/%d  │  Zona: %s  │  Você %d × %d Adversário" % [
 			GameState.round_num,
 			GameState.MAX_ROUNDS,
 			GameState.campaign_stage,
@@ -84,44 +103,40 @@ func refresh_ui():
 			GameState.ai_goals
 		]
 	else:
-		zone_label.text = "Desafio | Sequência: %d (recorde: %d) | Rodada %d/%d | Zona: %s | Você %d × %d Adversário" % [
+		zone_label.text = "Desafio (%d vitória(s))  │  Rodada %d/%d  │  Zona: %s  │  Você %d × %d Adversário" % [
 			GameState.challenge_wins,
-			GameState.challenge_best,
 			GameState.round_num,
 			GameState.MAX_ROUNDS,
 			zone_name,
 			GameState.goals,
 			GameState.ai_goals
 		]
-		
+
+	# 2. ATRIBUTOS DE ATAQUE E DEFESA SEPARADOS
+	var attacker: Dictionary
+	var defender: Dictionary
+
 	if has_player_ball:
-		var attacker = GameState.active_player()
-		var defender := {}
+		attacker = GameState.active_player()
 		match attacker["role"]:
-			"ZAG": defender = GameState.current_opponent_team()["squad"][3] # CA
-			"VOL": defender = GameState.current_opponent_team()["squad"][2] # MEI
-			"MEI": defender = GameState.current_opponent_team()["squad"][1] # VOL
-			"CA":  defender = GameState.current_opponent_team()["squad"][0] # ZAG
-
-		stats_label.text = \
-		"⚽ Com a bola: %s (%s) | PAS %d DRI %d SHO %d\n" % [
-			attacker["name"], attacker["role"], attacker["PAS"], attacker["DRI"], attacker["SHO"]
-		] + \
-		"🛡 Defendendo: %s (%s) | INT %d TAC %d BLQ %d" % [
-			defender["name"], defender["role"], defender["INT"], defender["TAC"], defender["BLQ"]
-		]
+			"ZAG": defender = GameState.current_opponent_team()["squad"][3]
+			"VOL": defender = GameState.current_opponent_team()["squad"][2]
+			"MEI": defender = GameState.current_opponent_team()["squad"][1]
+			"CA":  defender = GameState.current_opponent_team()["squad"][0]
 	else:
-		var attacker = GameState.ai_active_player()
-		var defender = GameState.squad[GameState.defender_for_attacker()]
+		attacker = GameState.ai_active_player()
+		defender = GameState.squad[GameState.defender_for_attacker()]
 
-		stats_label.text = \
-		"⚽ Com a bola: %s (%s) | PAS %d DRI %d SHO %d\n" % [
+	stats_label.text = (
+		"⚽ COM A BOLA: %s (%s)   │   PAS %d   DRI %d   SHO %d\n" % [
 			attacker["name"], attacker["role"], attacker["PAS"], attacker["DRI"], attacker["SHO"]
-		] + \
-		"🛡 Defendendo: %s (%s) | INT %d TAC %d BLQ %d" % [
+		] +
+		"🛡 DEFENDENDO: %s (%s)   │   INT %d   TAC %d   BLQ %d" % [
 			defender["name"], defender["role"], defender["INT"], defender["TAC"], defender["BLQ"]
 		]
+	)
 
+	# 3. CONTROLE DE TURNO (Ataque vs Defesa)
 	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
 
 	attack_container.visible = not is_defending
@@ -141,6 +156,7 @@ func refresh_ui():
 		tackle_button.modulate = color_for_chance(tac_chance)
 		block_button.modulate = color_for_chance(blq_chance)
 
+	# 4. CHANCES E HABILITAÇÃO DOS BOTÕES
 	var in_box = zone == GameState.ZONES.size() - 1
 	var in_final_third = zone == 2
 
@@ -167,11 +183,32 @@ func refresh_ui():
 
 	_rebuild_pass_buttons()
 
-	var can_next_match = GameState.match_over and GameState.goals > GameState.ai_goals and GameState.campaign_stage < GameState.MAX_CAMPAIGN_STAGE
+	var can_next_match = (
+		GameState.game_mode == GameState.GameMode.CAMPAIGN
+		and GameState.match_over
+		and GameState.goals > GameState.ai_goals
+	)	
 	next_match.visible = can_next_match
 
-	log_label.text = "\n".join(GameState.log_messages)
 
+# 5. LOG DE NARRAÇÃO (Estruturado em Ordem Cronológica)
+	var formatted_logs: Array[String] = []
+	var logs = GameState.log_messages.slice(0, 4) # Pega até os 4 eventos mais recentes
+
+	for i in range(logs.size()):
+		if i == 0:
+			# A jogada que ACABOU de acontecer (Destaque principal)
+			formatted_logs.append("▶ %s" % logs[i])
+		else:
+			# Jogadas anteriores em ordem
+			formatted_logs.append("  ↳ %s" % logs[i])
+
+	if formatted_logs.is_empty():
+		log_label.text = "🎙 Partida em andamento..."
+	else:
+		log_label.text = "\n".join(formatted_logs)
+		
+	# Efeitos visuais de gol
 	if GameState.goals > _last_goals:
 		_flash_goal(Color(1, 0.85, 0.3, 1))
 	elif GameState.ai_goals > _last_ai_goals:
@@ -180,21 +217,19 @@ func refresh_ui():
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
 
-	# --- DETECÇÃO DE FIM DE PARTIDA (OVERLAY) ---
+	# Painel de estatísticas ao final da partida
 	if GameState.match_over and not stats_opened:
 		stats_opened = true
 		show_match_stats()
 
 
 func show_match_stats():
-	# Instancia o painel por cima do jogo sem trocar de cena
 	var stats_overlay = MatchStatsScene.instantiate()
 	add_child(stats_overlay)
 
 
 func _rebuild_pass_buttons():
 	for child in pass_container.get_children():
-		pass_container.remove_child(child)
 		child.queue_free()
 
 	if GameState.match_over:
@@ -240,7 +275,7 @@ func _add_press_feedback(btn: Button) -> void:
 
 
 func _on_next_match_pressed():
-	stats_opened = false # Reseta para a próxima partida
+	stats_opened = false
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 		GameState.next_match()
 		get_tree().change_scene_to_file("res://scenes/campaign_menu.tscn")
@@ -248,10 +283,10 @@ func _on_next_match_pressed():
 		GameState.next_challenge_round()
 
 
-func _on_new_game_pressed():
-	stats_opened = false # Reseta ao reiniciar
-	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
-		GameState.reset_game()
-		get_tree().change_scene_to_file("res://scenes/campaign_menu.tscn")
-	else:
-		GameState.reset_game()
+func _on_options_pressed():
+	if has_node("OptionsMenu"):
+		return
+
+	var menu = OptionsMenuScene.instantiate()
+	menu.name = "OptionsMenu"
+	add_child(menu)

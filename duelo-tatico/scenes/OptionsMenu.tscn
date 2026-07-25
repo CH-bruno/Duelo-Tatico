@@ -1,0 +1,105 @@
+[gd_scene format=3 uid="uid://w8xsiylh1yq8"]
+
+[ext_resource type="Script" uid="uid://bkwrfv6wicyhu" path="res://scenes/OptionsMenu.gd" id="1_dpnyk"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bdakn"]
+bg_color = Color(0.07058824, 0.11764706, 0.09019608, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.8509804, 0.6509804, 0.2509804, 1)
+
+[node name="OptionsMenu" type="Control" unique_id=1775928718]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_dpnyk")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1950913252]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.6666667)
+
+[node name="CenterContainer" type="CenterContainer" parent="." unique_id=1763119250]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -240.0
+offset_right = 210.0
+offset_bottom = 240.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="CenterContainer" unique_id=794655450]
+custom_minimum_size = Vector2(420, 480)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bdakn")
+
+[node name="MarginContainer" type="MarginContainer" parent="CenterContainer/Panel" unique_id=1302424726]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 25
+theme_override_constants/margin_top = 25
+theme_override_constants/margin_right = 25
+theme_override_constants/margin_bottom = 25
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer/Panel/MarginContainer" unique_id=399574385]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=135832034]
+layout_mode = 2
+text = "Opções
+"
+
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=892269570]
+layout_mode = 2
+
+[node name="VolumeLabel" type="Label" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=471620246]
+layout_mode = 2
+text = "Volume: 100%
+"
+
+[node name="VolumeSlider" type="HSlider" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=752042543]
+layout_mode = 2
+
+[node name="ResetButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1231543321]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Nova Partida
+"
+
+[node name="SaveButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1350034518]
+layout_mode = 2
+text = "Salvar"
+
+[node name="SaveQuitButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=618934519]
+layout_mode = 2
+text = "Salvar e Sair"
+
+[node name="MenuButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=442033159]
+layout_mode = 2
+text = "Voltar ao Menu"
+
+[node name="QuitButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=1974379327]
+layout_mode = 2
+text = "Sair"
+
+[node name="CloseButton" type="Button" parent="CenterContainer/Panel/MarginContainer/VBoxContainer" unique_id=166143930]
+layout_mode = 2
+text = "Fechar"

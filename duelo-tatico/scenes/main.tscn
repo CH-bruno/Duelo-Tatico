@@ -32,9 +32,9 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 1
 
-[node name="MenuButton" type="Button" parent="VBoxContainer" unique_id=769820054]
+[node name="OptionsButton" type="Button" parent="VBoxContainer" unique_id=769820054]
 layout_mode = 2
-text = "Menu"
+text = "⚙ Opções"
 
 [node name="ZoneLabel" type="Label" parent="VBoxContainer" unique_id=1671663090]
 layout_mode = 2
@@ -45,7 +45,7 @@ layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("2_0wfyh")
 
-[node name="StatsLabel" type="Label" parent="VBoxContainer" unique_id=774211033]
+[node name="StatsLabel" type="Label" parent="VBoxContainer" unique_id=1630496771]
 layout_mode = 2
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=190161904]
@@ -88,10 +88,6 @@ text = "Bloquear
 
 [node name="LogLabel" type="Label" parent="VBoxContainer" unique_id=1688800370]
 layout_mode = 2
-
-[node name="ResetButton" type="Button" parent="VBoxContainer" unique_id=615899348]
-layout_mode = 2
-text = "Nova Partida"
 
 [node name="NextMatchButton" type="Button" parent="VBoxContainer" unique_id=1569836385]
 layout_mode = 2
