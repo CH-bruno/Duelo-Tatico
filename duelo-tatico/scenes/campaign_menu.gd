@@ -1,8 +1,6 @@
 extends Control
 # Tela de Campanha e Escalação Tática — Com Correção de Layout Vertical.
 
-const AppTheme = preload("res://scripts/AppTheme.gd")
-
 @onready var stage_label: Label = $VBoxContainer/StageLabel
 @onready var enemy_label: Label = $VBoxContainer/EnemyLabel
 @onready var stage_dots_label: Label = $VBoxContainer/StageDotsLabel
@@ -19,6 +17,9 @@ const AppTheme = preload("res://scripts/AppTheme.gd")
 @onready var mei_option: OptionButton = $VBoxContainer/LineupPanel/MeiOption
 @onready var ca_option: OptionButton = $VBoxContainer/LineupPanel/CaOption
 @onready var confirm_lineup_button: Button = $VBoxContainer/LineupPanel/ConfirmLineupButton
+
+const AppTheme = preload("res://scripts/AppTheme.gd")
+const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var lineup_confirmed := true
 
@@ -114,7 +115,7 @@ func _setup_visuals():
 			btn.mouse_filter = Control.MOUSE_FILTER_STOP
 			btn.custom_minimum_size = Vector2(260, 32) # 👈 Altura de 32px mais enxuta
 			btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-			_add_press_feedback(btn)
+			UIUtils.add_press_feedback(btn)
 
 	start_button.theme_type_variation = "" 
 	lineup_button.theme_type_variation = "GhostButton"
@@ -278,16 +279,3 @@ func _on_start_pressed():
 
 func _on_back_pressed():
 	get_tree().change_scene_to_file("res://scenes/start_screen.tscn")
-
-
-func _add_press_feedback(btn: Button) -> void:
-	btn.pivot_offset = btn.size / 2.0
-	btn.resized.connect(func(): btn.pivot_offset = btn.size / 2.0)
-	btn.button_down.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(0.96, 0.96), 0.06)
-	)
-	btn.button_up.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	)

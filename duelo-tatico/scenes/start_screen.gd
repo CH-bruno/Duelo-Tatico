@@ -1,12 +1,13 @@
 extends Control
 # StartScreen.gd — Menu Principal com Moldura e Fundo Animado do Gramado.
 
-const AppTheme = preload("res://scripts/AppTheme.gd")
-
 @onready var continue_button: Button = $CenterContainer/VBoxContainer/ContinueButton
 @onready var campaign_button: Button = $CenterContainer/VBoxContainer/CampaignButton
 @onready var challenge_button: Button = $CenterContainer/VBoxContainer/ChallengeButton
 @onready var quit_button: Button = $CenterContainer/VBoxContainer/QuitButton
+
+const AppTheme = preload("res://scripts/AppTheme.gd")
+const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var ball_t: float = 0.0
 var ball_direction: int = 1
@@ -90,7 +91,7 @@ func _apply_button_styles():
 	for btn in buttons:
 		if btn:
 			btn.custom_minimum_size = Vector2(250, 36)
-			_add_press_feedback(btn)
+			UIUtils.add_press_feedback(btn)
 
 	challenge_button.theme_type_variation = "GhostButton"
 	quit_button.theme_type_variation = "GhostButton"
@@ -116,15 +117,3 @@ func _challenge():
 	GameState.game_mode = GameState.GameMode.CHALLENGE
 	GameState.reset_game()
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
-
-func _add_press_feedback(btn: Button) -> void:
-	btn.pivot_offset = btn.size / 2.0
-	btn.resized.connect(func(): btn.pivot_offset = btn.size / 2.0)
-	btn.button_down.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(0.96, 0.96), 0.06)
-	)
-	btn.button_up.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	)

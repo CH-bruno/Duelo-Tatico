@@ -2,6 +2,7 @@ extends Control
 # Menu de Opções elegante, compacto e proporcional em ambos os modos.
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
+const UIUtils = preload("res://scripts/UIUtils.gd")
 
 @onready var background: ColorRect = $Background
 @onready var center_container: CenterContainer = $CenterContainer
@@ -118,7 +119,7 @@ func _ready():
 			btn.custom_minimum_size = Vector2(0, 32)
 			btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-			_add_press_feedback(btn)
+			UIUtils.add_press_feedback(btn)
 
 	# 5. Botão "Fechar" delicado e centralizado no rodapé
 	if close_button:
@@ -126,7 +127,7 @@ func _ready():
 		close_button.custom_minimum_size = Vector2(140, 30)
 		close_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		close_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		_add_press_feedback(close_button)
+		UIUtils.add_press_feedback(close_button)
 
 
 func _on_volume_changed(value: float) -> void:
@@ -190,16 +191,3 @@ func _unhandled_input(event):
 	if event.is_action_pressed("ui_cancel"):
 		get_tree().paused = false
 		queue_free()
-
-
-func _add_press_feedback(btn: Button) -> void:
-	btn.pivot_offset = btn.size / 2.0
-	btn.resized.connect(func(): btn.pivot_offset = btn.size / 2.0)
-	btn.button_down.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(0.96, 0.96), 0.06)
-	)
-	btn.button_up.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	)

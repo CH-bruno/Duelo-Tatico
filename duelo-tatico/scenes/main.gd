@@ -21,6 +21,7 @@ extends Control
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const OptionsMenuScene = preload("res://scenes/OptionsMenu.tscn")
 const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
+const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var _last_goals = 0
 var _last_ai_goals = 0
@@ -51,8 +52,18 @@ func _ready():
 	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
 	block_button.pressed.connect(func(): GameState.defend("BLOCK"))
 
-	for btn in [dri_button, feint_button, sho_button, long_shot_button, next_match, options_button, intercept_button, tackle_button, block_button]:
-		_add_press_feedback(btn)
+	for btn in [
+		dri_button,
+		feint_button,
+		sho_button,
+		long_shot_button,
+		next_match,
+		options_button,
+		intercept_button,
+		tackle_button,
+		block_button
+	]:
+		UIUtils.add_press_feedback(btn)
 
 	goal_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	goal_flash.modulate.a = 0.0
@@ -292,7 +303,7 @@ func _rebuild_pass_buttons():
 		var target_idx = i
 		btn.pressed.connect(func(): GameState.attempt("PASS", target_idx))
 		pass_container.add_child(btn)
-		_add_press_feedback(btn)
+		UIUtils.add_press_feedback(btn)
 
 
 func color_for_chance(chance_pct: int) -> Color:
@@ -305,19 +316,6 @@ func _flash_goal(color: Color) -> void:
 	goal_flash.modulate.a = 0.55
 	var tween = create_tween()
 	tween.tween_property(goal_flash, "modulate:a", 0.0, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-
-
-func _add_press_feedback(btn: Button) -> void:
-	btn.pivot_offset = btn.size / 2.0
-	btn.resized.connect(func(): btn.pivot_offset = btn.size / 2.0)
-	btn.button_down.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(0.92, 0.92), 0.08)
-	)
-	btn.button_up.connect(func():
-		var tween = create_tween()
-		tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.12).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	)
 
 
 func _on_next_match_pressed():

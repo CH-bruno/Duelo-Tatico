@@ -146,17 +146,23 @@ func defend(action: String) -> void:
 
 	if success:
 		match action:
-			"INTERCEPT": Stats.interceptions += 1
-			"TACKLE": Stats.tackles += 1
-			"BLOCK": Stats.blocks += 1
+			"INTERCEPT":
+				Stats.interceptions += 1
+				SFX.play_intercept()
+			"TACKLE":
+				Stats.tackles += 1
+				SFX.play_tackle()
+			"BLOCK":
+				Stats.blocks += 1
+				SFX.play_block()
+
 		GameState.push_log("Sua defesa (%s) funcionou! (%d%% de chance)" % [_label(action), chance])
-		SFX.play_music("res://audio/pass.mp3")
 		GameState.recover_possession(defender_idx)
+
 	else:
 		GameState.push_log("A defesa (%s) não foi suficiente (%d%% de chance)." % [_label(action), chance])
-		SFX.play_music("res://audio/pass.mp3")
+		SFX.play_defense_fail()
 		_move_succeeds()
-
 	GameState._advance_round()
 	GameState.state_changed.emit()
 
