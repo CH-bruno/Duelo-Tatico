@@ -51,25 +51,6 @@ layout_mode = 2
 layout_mode = 2
 text = "Escalar Time"
 
-[node name="LineupPanel" type="VBoxContainer" parent="VBoxContainer" unique_id=1381811535]
-layout_mode = 2
-
-[node name="ZagOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=952195734]
-layout_mode = 2
-
-[node name="VolOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=600714918]
-layout_mode = 2
-
-[node name="MeiOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=1608036145]
-layout_mode = 2
-
-[node name="CaOption" type="OptionButton" parent="VBoxContainer/LineupPanel" unique_id=439059892]
-layout_mode = 2
-
-[node name="ConfirmLineupButton" type="Button" parent="VBoxContainer/LineupPanel" unique_id=1393060519]
-layout_mode = 2
-text = "Confirmar Escalação"
-
 [node name="StartMatchButton" type="Button" parent="VBoxContainer" unique_id=822824562]
 layout_mode = 2
 text = "Começar Partida"

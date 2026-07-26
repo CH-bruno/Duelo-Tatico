@@ -1,5 +1,5 @@
 extends Control
-# Script da cena principal com Barra de Momentum Corrigida e sem Delays/Pop-ups.
+# Main.gd — Controlador principal da Partida (Fluxo, Sinais e Submódulos).
 
 @onready var zone_label: Label = $VBoxContainer/ZoneLabel
 @onready var stats_label: Label = $VBoxContainer/StatsLabel
@@ -27,19 +27,62 @@ var _last_goals = 0
 var _last_ai_goals = 0
 var stats_opened := false
 
-var momentum_bar: ProgressBar
+var match_ui: MatchUI
+var match_anims: MatchAnimations
 
 
 func _ready():
 	theme = AppTheme.build()
 	SFX.play_music("res://audio/music_match.mp3")
 	SFX.play_whistle()
-	
+
+	_init_submodules()
+	_connect_signals()
+
+	_last_goals = GameState.goals
+	_last_ai_goals = GameState.ai_goals
+
+	refresh_ui()
+
+
+func _init_submodules() -> void:
+	match_anims = MatchAnimations.new()
+	add_child(match_anims)
+	match_anims.setup(goal_flash, $VBoxContainer)
+
+	match_ui = MatchUI.new()
+	add_child(match_ui)
+	match_ui.setup({
+		"zone_label": zone_label,
+		"stats_label": stats_label,
+		"log_label": log_label,
+		"pass_container": pass_container,
+		"dri_button": dri_button,
+		"feint_button": feint_button,
+		"sho_button": sho_button,
+		"long_shot_button": long_shot_button,
+		"next_match": next_match,
+		"options_button": options_button,
+		"defense_container": defense_container,
+		"intercept_button": intercept_button,
+		"tackle_button": tackle_button,
+		"block_button": block_button,
+		"attack_container": attack_container
+	})
+
+	var all_buttons = [
+		dri_button, feint_button, sho_button, long_shot_button,
+		next_match, options_button, intercept_button, tackle_button, block_button
+	]
+	for btn in all_buttons:
+		UIUtils.add_press_feedback(btn)
+
+
+func _connect_signals() -> void:
 	GameState.state_changed.connect(refresh_ui)
 	if GameState.has_signal("match_event_triggered"):
 		GameState.match_event_triggered.connect(_on_match_event)
 
-	# Ações DIRETAS ao clicar (Sem delays ou pop-ups)
 	dri_button.pressed.connect(func(): GameState.attempt("DRI"))
 	feint_button.pressed.connect(func(): GameState.attempt("FEINT"))
 	sho_button.pressed.connect(func(): GameState.attempt("SHO"))
@@ -52,225 +95,16 @@ func _ready():
 	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
 	block_button.pressed.connect(func(): GameState.defend("BLOCK"))
 
-	for btn in [
-		dri_button,
-		feint_button,
-		sho_button,
-		long_shot_button,
-		next_match,
-		options_button,
-		intercept_button,
-		tackle_button,
-		block_button
-	]:
-		UIUtils.add_press_feedback(btn)
-
-	goal_flash.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	goal_flash.modulate.a = 0.0
-	goal_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	_setup_ui_styles()
-	_create_momentum_bar()
-
-	_last_goals = GameState.goals
-	_last_ai_goals = GameState.ai_goals
-
-	refresh_ui()
-
-
-# Cria e estiliza a Barra de Momentum (Pressão)
-func _create_momentum_bar():
-	if not has_node("MomentumContainer"):
-		var container = HBoxContainer.new()
-		container.name = "MomentumContainer"
-		container.alignment = BoxContainer.ALIGNMENT_CENTER
-		container.custom_minimum_size = Vector2(0, 26)
-		
-		var title = Label.new()
-		title.text = "🔥 PRESSÃO: "
-		title.add_theme_color_override("font_color", Color(0.9, 0.7, 0.2))
-		title.add_theme_font_size_override("font_size", 13)
-		
-		momentum_bar = ProgressBar.new()
-		momentum_bar.custom_minimum_size = Vector2(200, 16)
-		momentum_bar.min_value = 0
-		momentum_bar.max_value = 30
-		momentum_bar.value = 0
-		momentum_bar.show_percentage = false
-		
-		# Estilo de fundo (Trilho escuro)
-		var bg_style = StyleBoxFlat.new()
-		bg_style.bg_color = Color(0.08, 0.12, 0.09, 0.9)
-		bg_style.border_color = Color(0.3, 0.4, 0.3)
-		bg_style.set_border_width_all(1)
-		bg_style.set_corner_radius_all(4)
-		
-		# Estilo do preenchimento (Laranja Fogo)
-		var fill_style = StyleBoxFlat.new()
-		fill_style.bg_color = Color(0.95, 0.45, 0.1)
-		fill_style.set_corner_radius_all(4)
-		
-		momentum_bar.add_theme_stylebox_override("background", bg_style)
-		momentum_bar.add_theme_stylebox_override("fill", fill_style)
-		
-		container.add_child(title)
-		container.add_child(momentum_bar)
-		
-		$VBoxContainer.add_child(container)
-		$VBoxContainer.move_child(container, 1) # Insere logo abaixo do placar
-
-
-func _on_match_event(event_name: String, _details: Dictionary):
-	if event_name == "YELLOW_CARD":
-		_flash_goal(Color(1.0, 0.85, 0.1, 0.6))
-	elif event_name == "FOUL":
-		_flash_goal(Color(0.8, 0.8, 0.8, 0.3))
-
-
-func _setup_ui_styles():
-	if options_button:
-		options_button.text = "⚙️ Opções"
-		options_button.theme_type_variation = "GhostButton"
-		options_button.custom_minimum_size = Vector2(110, 30)
-		options_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-
-	if log_label:
-		log_label.custom_minimum_size = Vector2(0, 95)
-		log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		
-		var log_box = StyleBoxFlat.new()
-		log_box.bg_color = Color(0.06, 0.10, 0.07, 0.92)
-		log_box.border_color = Color(0.85, 0.65, 0.25, 0.6)
-		log_box.set_border_width_all(1)
-		log_box.set_corner_radius_all(8)
-		log_box.set_content_margin_all(10)
-		
-		log_label.add_theme_stylebox_override("normal", log_box)
-		log_label.add_theme_color_override("font_color", Color(0.95, 0.95, 0.90))
-
 
 func refresh_ui():
-	var has_player_ball = GameState.possession == GameState.Possession.PLAYER
+	match_ui.refresh()
+	match_anims.update_momentum(GameState.momentum_bonus)
 
-	var raw_zone = GameState.zone_idx if has_player_ball else GameState.ai_zone_idx
-	var zone = clampi(raw_zone, 0, GameState.ZONES.size() - 1)
-	var zone_name = GameState.ZONES[zone]
-
-	# Atualização direta e suave da Barra de Momentum
-	if momentum_bar:
-		var target_val = clamp(GameState.momentum_bonus, 0, 30)
-		var tween = create_tween()
-		tween.tween_property(momentum_bar, "value", target_val, 0.2)
-
-	# 1. TÍTULO E PLACAR SUPERIOR
-	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
-		zone_label.text = "Rodada %d/%d  │  Fase %d/%d  │  Zona: %s  │  Você %d × %d Adversário" % [
-			GameState.round_num, GameState.MAX_ROUNDS,
-			GameState.campaign_stage, GameState.MAX_CAMPAIGN_STAGE,
-			zone_name, GameState.goals, GameState.ai_goals
-		]
-	else:
-		zone_label.text = "Desafio (%d vitória(s))  │  Rodada %d/%d  │  Zona: %s  │  Você %d × %d Adversário" % [
-			GameState.challenge_wins, GameState.round_num, GameState.MAX_ROUNDS,
-			zone_name, GameState.goals, GameState.ai_goals
-		]
-
-	# 2. CARDS DE JOGADORES (Ataque vs Defesa)
-	var attacker: Dictionary
-	var defender: Dictionary
-
-	if has_player_ball:
-		attacker = GameState.active_player()
-		match attacker["role"]:
-			"ZAG": defender = GameState.current_opponent_team()["squad"][3]
-			"VOL": defender = GameState.current_opponent_team()["squad"][2]
-			"MEI": defender = GameState.current_opponent_team()["squad"][1]
-			"CA":  defender = GameState.current_opponent_team()["squad"][0]
-	else:
-		attacker = GameState.ai_active_player()
-		defender = GameState.squad[GameState.defender_for_attacker()]
-
-	stats_label.text = (
-		"⚽ COM A BOLA: %s (%s)   │   PAS %d   DRI %d   SHO %d\n" % [
-			attacker["name"], attacker["role"], attacker["PAS"], attacker["DRI"], attacker["SHO"]
-		] +
-		"🛡 DEFENDENDO: %s (%s)   │   INT %d   TAC %d   BLQ %d" % [
-			defender["name"], defender["role"], defender["INT"], defender["TAC"], defender["BLQ"]
-		]
-	)
-
-	# 3. TURNO E BOTÕES
-	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
-
-	attack_container.visible = not is_defending
-	pass_container.visible = not is_defending
-	defense_container.visible = is_defending
-
-	if is_defending:
-		var int_chance = GameState.defense_chance("INTERCEPT")
-		var tac_chance = GameState.defense_chance("TACKLE")
-		var blq_chance = GameState.defense_chance("BLOCK")
-
-		intercept_button.text = "Interceptação (%d%%)" % int_chance
-		tackle_button.text = "Desarme (%d%%)" % tac_chance
-		block_button.text = "Bloqueio (%d%%)" % blq_chance
-
-		intercept_button.modulate = color_for_chance(int_chance)
-		tackle_button.modulate = color_for_chance(tac_chance)
-		block_button.modulate = color_for_chance(blq_chance)
-
-	var in_box = zone == GameState.ZONES.size() - 1
-	var in_final_third = zone == 2
-
-	sho_button.disabled = not in_box or GameState.match_over
-	dri_button.disabled = GameState.match_over
-	feint_button.disabled = GameState.match_over
-	long_shot_button.disabled = not in_final_third or GameState.match_over
-	long_shot_button.visible = in_final_third
-
-	var dri_chance = GameState.chance_for("DRI")
-	var feint_chance = GameState.feint_chance()
-	var sho_chance = GameState.chance_for("SHO") if in_box else 0
-	var long_shot_chance = GameState.long_shot_chance() if in_final_third else 0
-
-	dri_button.text = "Drible (%d%%)" % dri_chance
-	feint_button.text = "Finta (%d%%)" % feint_chance
-	sho_button.text = "Chute (%d%%)" % sho_chance
-	long_shot_button.text = "Chute de Longe (%d%%)" % long_shot_chance
-
-	dri_button.modulate = color_for_chance(dri_chance)
-	feint_button.modulate = color_for_chance(feint_chance)
-	sho_button.modulate = color_for_chance(sho_chance) if in_box else Color.WHITE
-	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color.WHITE
-
-	_rebuild_pass_buttons()
-
-	var can_next_match = (
-		GameState.game_mode == GameState.GameMode.CAMPAIGN
-		and GameState.match_over
-		and GameState.goals > GameState.ai_goals
-	)	
-	next_match.visible = can_next_match
-
-	# 4. LOG DE NARRAÇÃO CRONOLÓGICO
-	var formatted_logs: Array[String] = []
-	var logs = GameState.log_messages.slice(0, 4)
-
-	for i in range(logs.size()):
-		if i == 0:
-			formatted_logs.append("▶ %s" % logs[i])
-		else:
-			formatted_logs.append("  ↳ %s" % logs[i])
-
-	if formatted_logs.is_empty():
-		log_label.text = "🎙 Partida em andamento..."
-	else:
-		log_label.text = "\n".join(formatted_logs)
-
+	# Flash de gol estilizado com as cores do AppTheme
 	if GameState.goals > _last_goals:
-		_flash_goal(Color(1, 0.85, 0.3, 1))
+		match_anims.flash(AppTheme.GOLD)
 	elif GameState.ai_goals > _last_ai_goals:
-		_flash_goal(Color(0.9, 0.3, 0.3, 1))
+		match_anims.flash(AppTheme.DANGER)
 
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
@@ -280,42 +114,16 @@ func refresh_ui():
 		show_match_stats()
 
 
+func _on_match_event(event_name: String, _details: Dictionary):
+	if event_name == "YELLOW_CARD":
+		match_anims.flash(AppTheme.WARNING)
+	elif event_name == "FOUL":
+		match_anims.flash(Color(0.8, 0.8, 0.8, 0.3))
+
+
 func show_match_stats():
 	var stats_overlay = MatchStatsScene.instantiate()
 	add_child(stats_overlay)
-
-
-func _rebuild_pass_buttons():
-	for child in pass_container.get_children():
-		child.queue_free()
-
-	if GameState.match_over:
-		return
-
-	for i in range(GameState.squad.size()):
-		if i == GameState.active_idx:
-			continue
-		var teammate = GameState.squad[i]
-		var pass_chance = GameState.pass_chance_to(i)
-		var btn = Button.new()
-		btn.text = "Passar p/ %s (%d%%)" % [teammate["name"], pass_chance]
-		btn.modulate = color_for_chance(pass_chance)
-		var target_idx = i
-		btn.pressed.connect(func(): GameState.attempt("PASS", target_idx))
-		pass_container.add_child(btn)
-		UIUtils.add_press_feedback(btn)
-
-
-func color_for_chance(chance_pct: int) -> Color:
-	var t = clampf(chance_pct / 100.0, 0.0, 1.0)
-	return Color(1.0, 0.3, 0.3).lerp(Color(0.4, 1.0, 0.4), t)
-
-
-func _flash_goal(color: Color) -> void:
-	goal_flash.color = color
-	goal_flash.modulate.a = 0.55
-	var tween = create_tween()
-	tween.tween_property(goal_flash, "modulate:a", 0.0, 0.6).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 
 
 func _on_next_match_pressed():
@@ -330,7 +138,6 @@ func _on_next_match_pressed():
 func _on_options_pressed():
 	if has_node("OptionsMenu"):
 		return
-
 	var menu = OptionsMenuScene.instantiate()
 	menu.name = "OptionsMenu"
 	add_child(menu)

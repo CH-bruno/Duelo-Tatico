@@ -1,5 +1,5 @@
 extends Control
-# Menu de Opções elegante, compacto e proporcional em ambos os modos.
+# OptionsMenu.gd — Menu de Opções e Pausa (Refatorado com AppTheme).
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
@@ -37,30 +37,30 @@ func _ready():
 	if center_container:
 		center_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
-	# 1. Painel mais compacto (Altura se adapta ao número de botões)
+	# 1. Painel com altura adaptativa e estilo do AppTheme
 	if panel:
 		var panel_height = 420 if GameState.game_mode == GameState.GameMode.CAMPAIGN else 320
 		panel.custom_minimum_size = Vector2(360, panel_height)
 		
 		var panel_style = StyleBoxFlat.new()
-		panel_style.bg_color = Color(0.12, 0.18, 0.14)
-		panel_style.border_color = Color(0.85, 0.65, 0.25)
+		panel_style.bg_color = AppTheme.PANEL
+		panel_style.border_color = AppTheme.GOLD
 		panel_style.set_border_width_all(2)
 		panel_style.set_corner_radius_all(8)
 		panel_style.set_content_margin_all(16)
 		panel.add_theme_stylebox_override("panel", panel_style)
 
-	# 2. VBoxContainer COMPACTO (não estica os botões verticalmente!)
+	# 2. VBoxContainer compacto
 	var vbox = $CenterContainer/Panel/MarginContainer/VBoxContainer
 	if vbox:
 		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		vbox.size_flags_vertical = Control.SIZE_SHRINK_BEGIN  # 👈 Impede os botões de ficarem "gordos"!
-		vbox.add_theme_constant_override("separation", 6)     # 👈 Espaçamento fino e bonito entre eles
+		vbox.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		vbox.add_theme_constant_override("separation", 6)
 
 	# Título em Dourado
 	if title_label:
 		title_label.text = "OPÇÕES DO JOGO"
-		title_label.add_theme_color_override("font_color", Color(0.85, 0.65, 0.25))
+		title_label.add_theme_color_override("font_color", AppTheme.GOLD)
 		title_label.add_theme_font_size_override("font_size", 16)
 		title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
@@ -100,18 +100,16 @@ func _ready():
 	menu_button.pressed.connect(_on_menu_pressed)
 	close_button.pressed.connect(_on_close_pressed)
 
-	# 3. Estilos dos Botões:
-	# Ações Principais (fundo preenchido)
+	# Varições Visuais dos Botões
 	reset_button.theme_type_variation = ""
 	save_button.theme_type_variation = ""
 	save_quit_button.theme_type_variation = ""
 
-	# Ações Secundárias (GhostButton = apenas contorno vazado, sem preenchimento pesado!)
 	menu_button.theme_type_variation = "GhostButton"
 	quit_button.theme_type_variation = "GhostButton"
 	close_button.theme_type_variation = "GhostButton"
 
-	# 4. Altura fixa fina para os botões principais (32px de altura)
+	# Tamanho e Feedback Visual dos Botões Principais
 	var main_buttons = [reset_button, save_button, save_quit_button, menu_button, quit_button]
 	for btn in main_buttons:
 		if btn:
@@ -121,7 +119,7 @@ func _ready():
 			btn.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			UIUtils.add_press_feedback(btn)
 
-	# 5. Botão "Fechar" delicado e centralizado no rodapé
+	# Botão "Fechar" delicado no rodapé
 	if close_button:
 		close_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		close_button.custom_minimum_size = Vector2(140, 30)

@@ -1,55 +1,71 @@
 extends Control
-# Overlay de estatísticas exibido por cima da partida.
+# MatchStats.gd — Overlay de Estatísticas Pós-Jogo (Refatorado com AppTheme).
 
-# Caminhos sincronizados com a árvore de nós real (MarginContainer -> Panel)
+const AppTheme = preload("res://scripts/AppTheme.gd")
+const UIUtils = preload("res://scripts/UIUtils.gd")
+
 @onready var background: ColorRect = $Background
 @onready var panel: Panel = $MarginContainer/Panel
 @onready var grid: GridContainer = $MarginContainer/Panel/MarginContainer/VBoxContainer/StatsGrid
 @onready var close_button: Button = $MarginContainer/Panel/MarginContainer/VBoxContainer/CloseButton
 @onready var title_label: Label = $MarginContainer/Panel/MarginContainer/VBoxContainer/Title
 
+
 func _ready():
+	theme = AppTheme.build()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Ajusta o fundo escuro do overlay
+	# Fundo escuro do overlay com transparência
 	if background:
 		background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		background.color = Color(0, 0, 0, 0.75)
 		background.mouse_filter = Control.MOUSE_FILTER_STOP
 
-	# Ajusta o tamanho do painel central de forma segura
+	# Estilização do painel central
 	if panel:
 		panel.custom_minimum_size = Vector2(550, 450)
 		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		
+		var panel_style = StyleBoxFlat.new()
+		panel_style.bg_color = AppTheme.PANEL
+		panel_style.border_color = AppTheme.GOLD
+		panel_style.set_border_width_all(1)
+		panel_style.set_corner_radius_all(10)
+		panel_style.set_content_margin_all(16)
+		panel.add_theme_stylebox_override("panel", panel_style)
 
 	if grid:
 		grid.columns = 2
 
-	# Conexão segura do botão de fechar
+	# Conexão do botão de fechar
 	if close_button:
 		close_button.mouse_filter = Control.MOUSE_FILTER_STOP
+		UIUtils.add_press_feedback(close_button)
+		
 		if not close_button.pressed.is_connected(_on_close_pressed):
 			close_button.pressed.connect(_on_close_pressed)
 
-		# Texto dinâmico de acordo com o resultado da partida
-		if GameState.match_over and GameState.goals > GameState.ai_goals:
+		if GameState.goals > GameState.ai_goals:
 			if GameState.campaign_stage >= GameState.MAX_CAMPAIGN_STAGE:
 				close_button.text = "Concluir Campanha"
 			else:
 				close_button.text = "Próxima Partida"
 		else:
 			close_button.text = "Tentar Novamente"
+
+	# Configuração do título de resultado
 	if title_label:
 		if GameState.goals > GameState.ai_goals:
 			title_label.text = "VITÓRIA!"
-			title_label.add_theme_color_override("font_color", Color("#f1c40f")) # Dourado
+			title_label.add_theme_color_override("font_color", AppTheme.GOLD)
 		elif GameState.goals == GameState.ai_goals:
 			title_label.text = "EMPATE!"
-			title_label.add_theme_color_override("font_color", Color("#bdc3c7")) # Cinza
+			title_label.add_theme_color_override("font_color", AppTheme.TEXT_COLOR)
 		else:
 			title_label.text = "DERROTA!"
-			title_label.add_theme_color_override("font_color", Color("#e74c3c")) # Vermelho
+			title_label.add_theme_color_override("font_color", AppTheme.DANGER)
+
 	_load_stats()
 
 
@@ -57,7 +73,6 @@ func _load_stats():
 	if not grid:
 		return
 
-	# Limpeza segura dos nós antigos da tabela
 	for child in grid.get_children():
 		grid.remove_child(child)
 		child.queue_free()
@@ -132,13 +147,15 @@ func add_stat(nome: String, valor: String) -> void:
 	var l = Label.new()
 	l.text = nome
 	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	l.add_theme_font_size_override("font_size", 16)
+	l.add_theme_font_size_override("font_size", 15)
+	l.add_theme_color_override("font_color", AppTheme.TEXT_COLOR)
 
 	var v = Label.new()
 	v.text = valor
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.add_theme_font_size_override("font_size", 16)
+	v.add_theme_font_size_override("font_size", 15)
+	v.add_theme_color_override("font_color", AppTheme.GOLD)
 
 	grid.add_child(l)
 	grid.add_child(v)

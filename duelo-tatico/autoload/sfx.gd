@@ -1,4 +1,5 @@
 extends Node
+# SFX.gd — Autoload de Gerenciamento de Áudio e Efeitos Sonoros do Jogo.
 
 var player: AudioStreamPlayer = null
 var music: AudioStreamPlayer = null
@@ -45,37 +46,33 @@ func play_music(path: String):
 	music.play()
 
 
+# ---------- Sons da Partida ----------
+
 func play_pass_success():
 	play_sound("res://audio/pass.mp3")
 
 
 func play_dribble():
-	#play_sound("res://audio/dribble.wav")
 	play_sound("res://audio/pass.mp3")
 
 
 func play_turnover():
-	#play_sound("res://audio/turnover.wav")
 	play_sound("res://audio/pass.mp3")
 
 
 func play_intercept():
-	#play_sound("res://audio/intercept.wav")
 	play_sound("res://audio/pass.mp3")
 
 
 func play_tackle():
-	#play_sound("res://audio/tackle.wav")
 	play_sound("res://audio/pass.mp3")
 
 
 func play_block():
-	#play_sound("res://audio/block.wav")
 	play_sound("res://audio/pass.mp3")
 
 
 func play_defense_fail():
-	#play_sound("res://audio/turnover.wav")
 	play_sound("res://audio/pass.mp3")
 
 

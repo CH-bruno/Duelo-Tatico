@@ -1,0 +1,107 @@
+[gd_scene format=3 uid="uid://crmb5k7xdwkwd"]
+
+[ext_resource type="Script" uid="uid://b5xc6rpkh0sen" path="res://scenes/main.gd" id="1_o5qli"]
+[ext_resource type="Script" uid="uid://djjtr400uy3lx" path="res://scenes/field_view.gd" id="2_0wfyh"]
+
+[node name="Main" type="Control" unique_id=1560941585]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_o5qli")
+
+[node name="Background" type="ColorRect" parent="." unique_id=796210114]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 1112.0
+offset_bottom = 608.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.07058824, 0.12156863, 0.09019608, 1)
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=508014390]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 1
+
+[node name="OptionsButton" type="Button" parent="VBoxContainer" unique_id=769820054]
+layout_mode = 2
+text = "⚙ Opções"
+
+[node name="ZoneLabel" type="Label" parent="VBoxContainer" unique_id=1671663090]
+layout_mode = 2
+
+[node name="FieldView" type="Control" parent="VBoxContainer" unique_id=884503055]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+size_flags_vertical = 3
+script = ExtResource("2_0wfyh")
+
+[node name="StatsLabel" type="Label" parent="VBoxContainer" unique_id=1630496771]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=190161904]
+layout_mode = 2
+
+[node name="DriButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=133721324]
+layout_mode = 2
+text = "Drible"
+
+[node name="ShoButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1406994525]
+layout_mode = 2
+text = "Chute"
+
+[node name="FeintButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1164373502]
+layout_mode = 2
+text = "Finta"
+
+[node name="LongShotButton" type="Button" parent="VBoxContainer/HBoxContainer" unique_id=1157374108]
+layout_mode = 2
+text = "Chute de longe"
+
+[node name="PassContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1141677544]
+layout_mode = 2
+
+[node name="DefenseContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1798104210]
+layout_mode = 2
+
+[node name="InterceptButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=598992495]
+layout_mode = 2
+text = "Interceptação"
+
+[node name="TackleButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=494047326]
+layout_mode = 2
+text = "Desarme"
+
+[node name="BlockButton" type="Button" parent="VBoxContainer/DefenseContainer" unique_id=1491687951]
+layout_mode = 2
+text = "Bloquear
+"
+
+[node name="LogLabel" type="Label" parent="VBoxContainer" unique_id=1688800370]
+layout_mode = 2
+
+[node name="NextMatchButton" type="Button" parent="VBoxContainer" unique_id=1569836385]
+layout_mode = 2
+text = "Próxima Partida"
+
+[node name="GoalFlash" type="ColorRect" parent="." unique_id=1704809105]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 1112.0
+offset_bottom = 608.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 0.84313726, 0, 1)
+metadata/_edit_use_anchors_ = true

@@ -100,3 +100,20 @@ const CA_RECOVERY = [
 	"%s (%s) recuperou a posse ainda no ataque!",
 	"%s (%s) forçou o erro da defesa adversária!"
 ]
+const FOUL = [
+	"Falta dura cometida no lance!",
+	"Entrada atrasada! O juiz paralisa a jogada.",
+	"Chegou forte demais! O árbitro apita a falta."
+]
+
+const YELLOW_CARD = [
+	"🟨 CARTÃO AMARELO! Entrada dura no lance.",
+	"🟨 O árbitro adverte a jogada faltosa com o cartão amarelo.",
+	"🟨 Cartão amarelo mostrado pelo árbitro!"
+]
+
+const RED_CARD = [
+	"🟥 CARTÃO VERMELHO DIRETO! Entrada desleal expulsa o jogador!",
+	"🟥 VERMELHO! O árbitro não tolera a violência da jogada!",
+	"🟥 EXPULSO! Entrada gravíssima e cartão vermelho mostrado!"
+]

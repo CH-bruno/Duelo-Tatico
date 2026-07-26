@@ -1,13 +1,13 @@
 extends Control
-# StartScreen.gd — Menu Principal com Moldura e Fundo Animado do Gramado.
+# StartScreen.gd — Menu Principal com Moldura e Fundo Animado do Gramado (Refatorado com AppTheme).
+
+const AppTheme = preload("res://scripts/AppTheme.gd")
+const UIUtils = preload("res://scripts/UIUtils.gd")
 
 @onready var continue_button: Button = $CenterContainer/VBoxContainer/ContinueButton
 @onready var campaign_button: Button = $CenterContainer/VBoxContainer/CampaignButton
 @onready var challenge_button: Button = $CenterContainer/VBoxContainer/ChallengeButton
 @onready var quit_button: Button = $CenterContainer/VBoxContainer/QuitButton
-
-const AppTheme = preload("res://scripts/AppTheme.gd")
-const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var ball_t: float = 0.0
 var ball_direction: int = 1
@@ -44,7 +44,7 @@ func _draw():
 	var center_y = viewport_size.y / 2.0
 
 	# 1. Fundo do Gramado Escuro
-	draw_rect(Rect2(Vector2.ZERO, viewport_size), Color(0.07, 0.12, 0.09))
+	draw_rect(Rect2(Vector2.ZERO, viewport_size), AppTheme.BACKGROUND)
 
 	# 2. Linhas do Campo
 	var line_color = Color(1.0, 1.0, 1.0, 0.08)
@@ -60,15 +60,15 @@ func _draw():
 
 	var current_ball_pos = p1_pos.lerp(p2_pos, ball_t)
 	current_ball_pos.y -= sin(ball_t * PI) * 22.0
-	draw_circle(current_ball_pos, 6, Color(1.0, 1.0, 0.85))
+	draw_circle(current_ball_pos, 6, AppTheme.TEXT_COLOR)
 
 
 func _apply_card_frame():
 	var vbox = $CenterContainer/VBoxContainer
 	if vbox and not $CenterContainer.has_node("MenuCardPanel"):
 		var card_style = StyleBoxFlat.new()
-		card_style.bg_color = Color(0.05, 0.09, 0.06, 0.85)
-		card_style.border_color = Color(0.85, 0.65, 0.25, 0.7)
+		card_style.bg_color = AppTheme.PANEL
+		card_style.border_color = AppTheme.GOLD.darkened(0.2)
 		card_style.set_border_width_all(1)
 		card_style.set_corner_radius_all(12)
 		card_style.set_content_margin_all(20)
@@ -90,7 +90,7 @@ func _apply_button_styles():
 	
 	for btn in buttons:
 		if btn:
-			btn.custom_minimum_size = Vector2(250, 36)
+			btn.custom_minimum_size = AppTheme.BUTTON_SIZE_DEFAULT
 			UIUtils.add_press_feedback(btn)
 
 	challenge_button.theme_type_variation = "GhostButton"

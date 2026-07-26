@@ -1,3 +1,4 @@
+class_name RosterData
 extends RefCounted
 # Dados fixos do elenco: quem existe, atributos base, traits.
 # Sem estado próprio — só dados e funções puras com tipagem forte.

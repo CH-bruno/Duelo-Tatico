@@ -9,7 +9,15 @@ const BUTTON_BG = Color(0.16, 0.24, 0.19)
 const BUTTON_HOVER = Color(0.22, 0.32, 0.25)
 const BUTTON_PRESSED = Color(0.12, 0.18, 0.14)
 const BUTTON_DISABLED = Color(0.12, 0.15, 0.13)
+const GOLD = Color8(217, 166, 64)        # Color(0.85, 0.65, 0.25)
+const PANEL = Color8(31, 46, 36)          # Fundo de Cards / Painéis
+const BACKGROUND = Color8(18, 30, 23)      # Fundo do Gramado / Tela Escura
+const SUCCESS = Color8(90, 220, 90)       # Verdes de confirmação / Destaque
+const WARNING = Color8(255, 200, 70)      # Amarelo / Alertas
+const DANGER = Color8(220, 80, 80)        # Vermelhos / Erros
 
+const BUTTON_SIZE_DEFAULT = Vector2(250, 36)
+const BUTTON_SIZE_COMPACT = Vector2(260, 32)
 
 static func build() -> Theme:
 	var theme = Theme.new()

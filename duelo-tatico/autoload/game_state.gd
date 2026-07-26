@@ -1,10 +1,8 @@
 extends Node
-# Autoload (singleton) que orquestra o jogo: guarda o ESTADO da partida
-# e o FLUXO (o que acontece quando o quê). Dados fixos do elenco vivem
-# em RosterData.gd, fórmulas de chance em Rules.gd, decisões da IA e
-# defesa em AIOpponent.gd, estatísticas de resumo em Stats.gd.
+# GameState.gd — Autoload (Singleton) Central de Estado e Regras de Jogo.
 
 signal state_changed
+signal match_event_triggered(event_name: String, details: Dictionary)
 
 const Narration = preload("res://scripts/Narration.gd")
 const RosterData = preload("res://scripts/RosterData.gd")
@@ -18,7 +16,7 @@ const MAX_ROUNDS = 30
 var starters = [0, 2, 4, 6]
 var squad = []
 
-# Dicionário que armazena a stamina de cada jogador no elenco { roster_idx: float }
+# Dicionário de Stamina dos Jogadores { roster_idx: float }
 var player_stamina: Dictionary = {}
 
 var zone_idx = 0
@@ -26,7 +24,7 @@ var active_idx = 0
 
 var level = 1
 var xp = 0
-var pending_xp = 0 # 👈 XP acumulado na partida que só é aplicado ao final!
+var pending_xp = 0 # XP acumulado na partida aplicado após o apito final
 var xp_to_next = 20
 
 var goals = 0
@@ -77,6 +75,25 @@ func init_stamina() -> void:
 		player_stamina[i] = 100.0
 
 
+# Retorna a stamina atual do jogador (0 a 100)
+func get_stamina(roster_idx: int) -> float:
+	if player_stamina.has(roster_idx):
+		return player_stamina[roster_idx]
+	return 100.0
+
+
+# Define a stamina de um jogador específico
+func set_stamina(roster_idx: int, amount: float) -> void:
+	player_stamina[roster_idx] = clampf(amount, 0.0, 100.0)
+
+
+# Consome stamina dos titulares
+func consume_starter_stamina(cost: float = 12.0) -> void:
+	for idx in starters:
+		var current = get_stamina(idx)
+		set_stamina(idx, current - cost)
+
+
 func apply_match_fatigue() -> void:
 	for i in range(RosterData.ROSTER.size()):
 		if not player_stamina.has(i):
@@ -88,6 +105,13 @@ func apply_match_fatigue() -> void:
 		else:
 			# Reservas recuperam 30% de energia descansando no banco
 			player_stamina[i] = minf(100.0, player_stamina[i] + 30.0)
+
+
+func set_starter(role_idx: int, roster_idx: int) -> void:
+	if role_idx >= 0 and role_idx < starters.size():
+		starters[role_idx] = roster_idx
+		_apply_lineup()
+		state_changed.emit()
 
 
 func candidates_for(role_idx: int) -> Array:
@@ -116,7 +140,7 @@ func _apply_lineup() -> void:
 	
 	for idx in starters:
 		var p = RosterData.ROSTER[idx].duplicate()
-		var stamina_val = player_stamina.get(idx, 100.0)
+		var stamina_val = get_stamina(idx)
 		
 		# Multiplicador de desempenho baseado no cansaço
 		var stamina_mult = 1.0
@@ -306,6 +330,7 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			grant_xp(1)
 			push_log(Narration.DRIBBLE_FAIL.pick_random() % [passer["name"], passer["role"]])
 			SFX.play_turnover()
+			trigger_foul_check(true)
 			AIOpponent.reset_possession("", zone_idx)
 			momentum_bonus = 0
 
@@ -323,6 +348,7 @@ func attempt(action: String, target_idx: int = -1) -> void:
 			momentum_bonus = 30
 		else:
 			grant_xp(1)
+			trigger_foul_check(true)
 			AIOpponent.reset_possession(Narration.FEINT_FAIL.pick_random() % [passer["name"], passer["role"]], zone_idx)
 			momentum_bonus = 0
 
@@ -367,6 +393,16 @@ func attempt(action: String, target_idx: int = -1) -> void:
 
 	_advance_round()
 	state_changed.emit()
+
+
+func trigger_foul_check(_is_player: bool) -> bool:
+	# 15% de chance de falta simples ao errar drible/desarme
+	if randf() < 0.15:
+		push_log("⚠️ FALTA! O juiz paralisa a jogada.")
+		SFX.play_whistle()
+		match_event_triggered.emit("FOUL", {})
+		return true
+	return false
 
 
 func recover_possession(defender_idx: int) -> void:
@@ -415,7 +451,6 @@ func _advance_round() -> void:
 		match_over = true
 		SFX.play_whistle()
 		
-		# Aplica o XP pendente da partida agora que o apito final foi dado!
 		_process_pending_xp()
 		
 		if goals > ai_goals:
@@ -449,29 +484,11 @@ func defense_chance(action: String) -> int:
 
 func defend(action: String) -> void:
 	AIOpponent.defend(action)
-# Adicione esta sinalização para a UI reagir a eventos especiais
-signal match_event_triggered(event_name: String, details: Dictionary)
 
-# Adicione no atalho de erro de desarme ou tentativa de ação:
-func trigger_foul_check(is_player: bool) -> bool:
-	# 20% de chance de falta ao errar desarme agressivo
-	if randf() < 0.20:
-		var card_given = randf() < 0.35 # 35% de chance de ser Amarelo
-		if card_given:
-			push_log("🟨 CARTÃO AMARELO! Entrada dura no lance.")
-			SFX.play_whistle()
-			match_event_triggered.emit("YELLOW_CARD", {})
-		else:
-			push_log("⚠️ FALTA! O juiz paralisa a jogada.")
-			SFX.play_whistle()
-			match_event_triggered.emit("FOUL", {})
-		return true
-	return false
 
 # ---------- XP / Progressão ----------
 
 func grant_xp(amount: int) -> void:
-	# Guarda o XP obtido durante a partida sem subir os atributos no meio do jogo
 	Stats.xp_gained_match += amount
 	pending_xp += amount
 
@@ -513,7 +530,7 @@ func next_match() -> void:
 		return
 
 	apply_match_fatigue()
-	_apply_lineup() # 👈 Atualiza o squad já com os atributos evoluídos e cansaço aplicado
+	_apply_lineup()
 
 	campaign_stage += 1
 	log_messages.clear()
