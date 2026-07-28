@@ -44,10 +44,24 @@ func setup(nodes: Dictionary) -> void:
 
 func _setup_ui_styles() -> void:
 	if options_button:
-		options_button.text = "⚙️ Opções"
+		options_button.text = "⚙ Opções"
 		options_button.theme_type_variation = "GhostButton"
-		options_button.custom_minimum_size = Vector2(110, 30)
-		options_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		options_button.custom_minimum_size = Vector2(90, 30)
+		options_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	if zone_label:
+		zone_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		zone_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		zone_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		zone_label.add_theme_font_size_override("font_size", 12)
+
+		var header_box = StyleBoxFlat.new()
+		header_box.bg_color = AppTheme.PANEL
+		header_box.border_color = AppTheme.GOLD.darkened(0.3)
+		header_box.set_border_width_all(1)
+		header_box.set_corner_radius_all(6)
+		header_box.set_content_margin_all(6)
+		zone_label.add_theme_stylebox_override("normal", header_box)
 
 	if log_label:
 		log_label.custom_minimum_size = Vector2(0, 95)
@@ -69,17 +83,19 @@ func refresh() -> void:
 	var raw_zone = GameState.zone_idx if has_player_ball else GameState.ai_zone_idx
 	var zone = clampi(raw_zone, 0, GameState.ZONES.size() - 1)
 	var zone_name = GameState.ZONES[zone]
+	var half_text = "1º Tempo" if GameState.first_half else "2º Tempo"
 
-	# 1. TÍTULO E PLACAR SUPERIOR
+	# 1. TÍTULO E PLACAR DA BARRA SUPERIOR
 	if GameState.game_mode == GameState.GameMode.CAMPAIGN:
-		zone_label.text = "Rodada %d/%d  │  Fase %d/%d  │  Zona: %s  │  Você %d × %d Adversário" % [
-			GameState.round_num, GameState.MAX_ROUNDS,
+		zone_label.text = "⏱ %s (%d/30)  │  ⚽ Fase %d/%d  │  📍 %s  │  Você %d × %d Rival" % [
+			half_text, GameState.round_num,
 			GameState.campaign_stage, GameState.MAX_CAMPAIGN_STAGE,
 			zone_name, GameState.goals, GameState.ai_goals
 		]
 	else:
-		zone_label.text = "Desafio (%d vitória(s))  │  Rodada %d/%d  │  Zona: %s  │  Você %d × %d Adversário" % [
-			GameState.challenge_wins, GameState.round_num, GameState.MAX_ROUNDS,
+		zone_label.text = "⏱ %s (%d/30)  │  🏆 Desafio: %dV  │  📍 %s  │  Você %d × %d Rival" % [
+			half_text, GameState.round_num,
+			GameState.challenge_wins,
 			zone_name, GameState.goals, GameState.ai_goals
 		]
 
@@ -93,7 +109,7 @@ func refresh() -> void:
 			"ZAG": defender = GameState.current_opponent_team()["squad"][3]
 			"VOL": defender = GameState.current_opponent_team()["squad"][2]
 			"MEI": defender = GameState.current_opponent_team()["squad"][1]
-			"CA":  defender = GameState.current_opponent_team()["squad"][0]
+			"CA": defender = GameState.current_opponent_team()["squad"][0]
 	else:
 		attacker = GameState.ai_active_player()
 		defender = GameState.squad[GameState.defender_for_attacker()]
@@ -136,7 +152,6 @@ func refresh() -> void:
 	long_shot_button.disabled = not in_final_third or GameState.match_over
 	long_shot_button.visible = in_final_third
 
-	# Consulta direta ao MatchEngine passando a instância do GameState
 	var dri_chance = MatchEngine.chance_for(GameState, "DRI")
 	var feint_chance = MatchEngine.feint_chance(GameState)
 	var sho_chance = MatchEngine.chance_for(GameState, "SHO") if in_box else 0
@@ -188,7 +203,6 @@ func rebuild_pass_buttons() -> void:
 		if i == GameState.active_idx:
 			continue
 		var teammate = GameState.squad[i]
-		# Consulta direta ao MatchEngine para probabilidade de passe
 		var pass_chance = MatchEngine.pass_chance_to(GameState, i)
 		var btn = Button.new()
 		btn.text = "Passar p/ %s (%d%%)" % [teammate["name"], pass_chance]

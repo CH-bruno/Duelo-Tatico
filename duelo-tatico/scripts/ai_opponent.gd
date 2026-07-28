@@ -2,9 +2,6 @@ class_name AIOpponent
 extends Node
 # AIOpponent.gd — Cérebro do adversário e resolução de ações defensivas.
 
-const Narration = preload("res://scripts/Narration.gd")
-const RosterData = preload("res://scripts/RosterData.gd")
-
 static func attack_strength() -> int:
 	var p = GameState.ai_active_player()
 	var stat = 0
@@ -236,3 +233,24 @@ static func _move_succeeds() -> void:
 
 		GameState.AIMove.LONG_SHOT, GameState.AIMove.SHOT:
 			resolve_shot()
+
+static func check_ai_substitutions() -> void:
+	var team = GameState.current_opponent_team()
+	var squad = team["squad"]
+
+	# A IA tem até 2 substituições por jogo
+	if not team.has("subs_left"):
+		team["subs_left"] = 2
+
+	if team["subs_left"] <= 0:
+		return
+
+	for i in range(squad.size()):
+		var p = squad[i]
+		# Se a stamina do jogador do time rival baixar de 45%
+		var st = p.get("stamina", 100.0)
+		if st < 45.0:
+			team["subs_left"] -= 1
+			p["stamina"] = 100.0 # Reserva entra com energia renovada
+			GameState.push_log("🔄 O adversário substituiu %s (%s) por fôlego novo!" % [p["name"], p["role"]])
+			break

@@ -85,6 +85,52 @@ static func process_halftime_recovery(gs: Node) -> void:
 		gs.set_stamina(roster_idx, current + recovery)
 
 
+# Executa a substituição validando limites e disponibilidade
+static func make_substitution(gs: Node, role_idx: int, new_roster_idx: int) -> bool:
+	if gs.substitutions_left <= 0:
+		gs.push_log("Não há substituições restantes nesta partida!")
+		return false
+
+	if new_roster_idx in gs.players_out:
+		gs.push_log("Este jogador já foi substituído e não pode voltar!")
+		return false
+
+	var old_roster_idx = gs.starters[role_idx]
+	var old_player = RosterData.ROSTER[old_roster_idx]
+	var new_player = RosterData.ROSTER[new_roster_idx]
+	var old_stamina = int(gs.get_stamina(old_roster_idx))
+
+	# Registra o jogador substituído como indisponível para o resto da partida
+	gs.players_out.append(old_roster_idx)
+
+	# Aplica a troca na escalação titular
+	gs.starters[role_idx] = new_roster_idx
+	gs.substitutions_left -= 1
+
+	# Atualiza o squad no GameState
+	gs._apply_lineup()
+
+	# Narração no Log
+	var msg = "🔄 Substituição: Sai %s (%d%% stamina) e entra %s!" % [old_player["name"], old_stamina, new_player["name"]]
+	gs.push_log(msg)
+	SFX.play_whistle()
+
+	gs.state_changed.emit()
+	return true
+
+
+# Retorna lista de reservas disponíveis para determinada posição (exclui titulares e quem já saiu)
+static func available_bench_for(gs: Node, role_idx: int) -> Array:
+	var role = RosterData.ROLES[role_idx]
+	var candidates = []
+	for i in range(RosterData.ROSTER.size()):
+		var p = RosterData.ROSTER[i]
+		if p["role"] == role:
+			if not (i in gs.starters) and not (i in gs.players_out):
+				candidates.append(i)
+	return candidates
+
+
 static func apply_match_fatigue(_stamina_dict: Dictionary, _starters: Array) -> void:
 	pass
 

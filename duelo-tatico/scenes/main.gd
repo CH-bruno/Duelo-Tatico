@@ -1,7 +1,8 @@
 extends Control
-# Main.gd — Controlador principal da Partida (Fluxo, Sinais, Intervalo e Submódulos).
+# Main.gd — Controlador principal da Partida
 
-@onready var zone_label: Label = $VBoxContainer/ZoneLabel
+@onready var zone_label: Label = $VBoxContainer/TopHeader/ZoneLabel
+@onready var options_button: Button = $VBoxContainer/TopHeader/OptionsButton
 @onready var stats_label: Label = $VBoxContainer/StatsLabel
 @onready var log_label: Label = $VBoxContainer/LogLabel
 @onready var pass_container: HBoxContainer = $VBoxContainer/PassContainer
@@ -10,7 +11,6 @@ extends Control
 @onready var sho_button: Button = $VBoxContainer/HBoxContainer/ShoButton
 @onready var long_shot_button: Button = $VBoxContainer/HBoxContainer/LongShotButton
 @onready var next_match: Button = $VBoxContainer/NextMatchButton
-@onready var options_button: Button = $VBoxContainer/OptionsButton
 @onready var goal_flash: ColorRect = $GoalFlash
 @onready var defense_container: HBoxContainer = $VBoxContainer/DefenseContainer
 @onready var intercept_button: Button = $VBoxContainer/DefenseContainer/InterceptButton
@@ -21,9 +21,11 @@ extends Control
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const OptionsMenuScene = preload("res://scenes/OptionsMenu.tscn")
 const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
+const SubstitutionDialogScene = preload("res://scenes/SubstitutionDialog.tscn")
 const HalftimeDialogScript = preload("res://scenes/HalftimeDialog.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
 
+var sub_button: Button = null
 var _last_goals = 0
 var _last_ai_goals = 0
 var stats_opened := false
@@ -37,6 +39,7 @@ func _ready():
 	SFX.play_music("res://assets/audio/music_match.mp3")
 	SFX.play_whistle()
 
+	_setup_top_header_buttons()
 	_init_submodules()
 	_connect_signals()
 
@@ -44,6 +47,28 @@ func _ready():
 	_last_ai_goals = GameState.ai_goals
 
 	refresh_ui()
+
+
+func _setup_top_header_buttons() -> void:
+	var header = options_button.get_parent()
+	
+	# Estiliza o botão de Opções de forma bem compacta
+	options_button.text = "⚙ Opções"
+	options_button.custom_minimum_size = Vector2(90, 30)
+	options_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+	# Cria o botão de Subs apenas se ele ainda não existir
+	if sub_button == null:
+		sub_button = Button.new()
+		sub_button.name = "SubButton"
+		sub_button.theme_type_variation = "GhostButton"
+		sub_button.custom_minimum_size = Vector2(90, 30)
+		sub_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		
+		header.add_child(sub_button)
+		header.move_child(sub_button, options_button.get_index())
+
+	sub_button.text = "🔄 Subs (%d)" % GameState.substitutions_left
 
 
 func _init_submodules() -> void:
@@ -75,8 +100,12 @@ func _init_submodules() -> void:
 		dri_button, feint_button, sho_button, long_shot_button,
 		next_match, options_button, intercept_button, tackle_button, block_button
 	]
+	if sub_button:
+		all_buttons.append(sub_button)
+
 	for btn in all_buttons:
-		UIUtils.add_press_feedback(btn)
+		if btn:
+			UIUtils.add_press_feedback(btn)
 
 
 func _connect_signals() -> void:
@@ -91,6 +120,9 @@ func _connect_signals() -> void:
 
 	next_match.pressed.connect(_on_next_match_pressed)
 	options_button.pressed.connect(_on_options_pressed)
+	
+	if sub_button:
+		sub_button.pressed.connect(_open_substitutions_dialog)
 
 	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
 	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
@@ -101,7 +133,10 @@ func refresh_ui():
 	match_ui.refresh()
 	match_anims.update_momentum(GameState.momentum_bonus)
 
-	# Flash de gol estilizado com as cores do AppTheme
+	if sub_button:
+		sub_button.text = "🔄 Subs (%d)" % GameState.substitutions_left
+		sub_button.disabled = GameState.match_over or GameState.substitutions_left <= 0
+
 	if GameState.goals > _last_goals:
 		match_anims.flash(AppTheme.GOLD)
 	elif GameState.ai_goals > _last_ai_goals:
@@ -129,18 +164,29 @@ func _show_halftime_dialog(details: Dictionary) -> void:
 	if has_node("HalftimeDialog"):
 		return
 
-	# Agora herdamos de ColorRect (Overlay)
 	var dialog = ColorRect.new()
 	dialog.name = "HalftimeDialog"
 	dialog.set_script(HalftimeDialogScript)
 	add_child(dialog)
 
-	# Chama a configuração
 	dialog.setup(details)
 
 	dialog.continued.connect(func():
-		refresh_ui()
+		if GameState.can_substitute():
+			_open_substitutions_dialog()
+		else:
+			refresh_ui()
 	)
+
+
+func _open_substitutions_dialog() -> void:
+	if has_node("SubstitutionDialog"):
+		return
+
+	var dialog = SubstitutionDialogScene.instantiate()
+	add_child(dialog)
+	dialog.setup()
+	dialog.closed.connect(refresh_ui)
 
 
 func show_match_stats():

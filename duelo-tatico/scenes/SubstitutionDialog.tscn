@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://dp5ky6q4cd8pn"]
+
+[ext_resource type="Script" uid="uid://d1yu65wk6ke4f" path="res://scenes/SubstitutionDialog.gd" id="1_q4i4n"]
+
+[node name="SubstitutionDialog" type="ColorRect" unique_id=1807960347]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_q4i4n")

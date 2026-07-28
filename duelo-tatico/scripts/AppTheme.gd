@@ -15,6 +15,7 @@ const BACKGROUND = Color8(18, 30, 23)      # Fundo do Gramado / Tela Escura
 const SUCCESS = Color8(90, 220, 90)       # Verdes de confirmação / Destaque
 const WARNING = Color8(255, 200, 70)      # Amarelo / Alertas
 const DANGER = Color8(220, 80, 80)        # Vermelhos / Erros
+const MUTED = Color(0.6, 0.65, 0.6)       # Cinza opaco / Textos desativados e secundários
 
 const BUTTON_SIZE_DEFAULT = Vector2(250, 36)
 const BUTTON_SIZE_COMPACT = Vector2(260, 32)
@@ -62,8 +63,6 @@ static func build() -> Theme:
 	theme.set_color("font_color", "ProgressBar", TEXT_COLOR)
 
 	# "GhostButton" — variação pra ações secundárias (Voltar, Menu):
-	# só contorno, sem preenchimento, pra não competir visualmente com
-	# os botões de ação principal.
 	theme.add_type("GhostButton")
 
 	var ghost_normal = StyleBoxFlat.new()

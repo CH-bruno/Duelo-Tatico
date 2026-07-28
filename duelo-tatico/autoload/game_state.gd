@@ -29,6 +29,8 @@ var challenge_best = 0
 var starters = [0, 2, 4, 6]
 var squad = []
 var player_stamina: Dictionary = {}
+var substitutions_left: int = 2
+var players_out: Array = []
 
 # ---------- 3. POSSE ----------
 enum Possession { PLAYER, AI }
@@ -110,6 +112,16 @@ func set_stamina(roster_idx: int, amount: float) -> void:
 	
 func reset_all_stamina() -> void:
 	LineupManager.reset_all_stamina(player_stamina)
+
+func reset_substitutions() -> void:
+	substitutions_left = 2
+	players_out.clear()
+
+func can_substitute() -> bool:
+	return substitutions_left > 0
+
+func make_substitution(role_idx: int, new_roster_idx: int) -> bool:
+	return LineupManager.make_substitution(self, role_idx, new_roster_idx)
 	
 func apply_match_fatigue() -> void:
 	LineupManager.apply_match_fatigue(player_stamina, starters)

@@ -12,6 +12,7 @@ static func next_match(gs: Node) -> void:
 	gs._apply_lineup()
 
 	gs.campaign_stage += 1
+	gs.reset_substitutions()
 	gs.log_messages.clear()
 	gs.reset_match_stats()
 	gs.possession = gs.Possession.PLAYER
@@ -26,25 +27,25 @@ static func next_match(gs: Node) -> void:
 
 	MatchEngine.kickoff(gs, true)
 
-	gs.push_log("Fase %d iniciada!" % gs.campaign_stage)
+	gs.push_log("⚽ Apito Inicial: Inicio do 1º Tempo! (Fase %d)" % gs.campaign_stage)
 	gs.push_log("A bola está com o %s." % gs.active_player()["name"])
 	SFX.play_whistle()
 	SaveSystem.save_game()
 	gs.state_changed.emit()
 
 
-# Avança no Modo Desafio (Restaura stamina para 100% para o novo desafio)
+# Avança no Modo Desafio
 static func next_challenge_round(gs: Node) -> void:
 	if not gs.match_over or gs.goals <= gs.ai_goals:
 		return
 
 	gs.challenge_wins += 1
 	gs.challenge_best = max(gs.challenge_best, gs.challenge_wins)
+	gs.reset_substitutions()
 	gs.log_messages.clear()
 	gs.reset_match_stats()
 	gs.possession = gs.Possession.PLAYER
 
-	# Reseta a stamina de todos para 100% a cada nova rodada do Desafio
 	gs.reset_all_stamina()
 	gs._apply_lineup()
 
@@ -58,24 +59,27 @@ static func next_challenge_round(gs: Node) -> void:
 
 	MatchEngine.kickoff(gs, true)
 
-	gs.push_log("Sobrevivência: %d vitória(s) seguida(s)! O adversário fica mais forte." % gs.challenge_wins)
+	gs.push_log("⚽ Apito Inicial: Inicio do 1º Tempo! (Sobrevivência %d)" % gs.challenge_wins)
 	SFX.play_whistle()
 	gs.state_changed.emit()
 
 
-# Processamento do Intervalo da Partida
+# Processamento do Intervalo e Início do 2º Tempo
 static func half_time(gs: Node) -> void:
 	SFX.play_whistle()
-	gs.push_log("⏱ Apito do árbitro: Fim do Primeiro Tempo!")
+	gs.push_log("⏱ Apito do árbitro: Fim do 1º Tempo! As equipes vão para o intervalo.")
 
-	# Recuperação proporcional ao desgaste acumulado no 1º Tempo
+	# Recuperação proporcional no vestiário
 	LineupManager.process_halftime_recovery(gs)
 
 	gs.momentum_bonus = 0
 	gs.ai_momentum = 0
 	gs.streak = 0
+	gs.first_half = false
 
 	MatchEngine.kickoff(gs, false)
+
+	gs.push_log("🔥 Começa o 2º Tempo! Saída de bola com %s." % gs.active_player()["name"])
 
 	gs.emit_match_event("HALF_TIME", {
 		"goals": gs.goals,
@@ -84,7 +88,7 @@ static func half_time(gs: Node) -> void:
 	})
 
 
-# Reset Completo do Jogo (Novo Jogo do zero)
+# Reset Completo do Jogo
 static func reset_game(gs: Node) -> void:
 	gs.level = 1
 	gs.xp = 0
@@ -92,7 +96,7 @@ static func reset_game(gs: Node) -> void:
 	gs.xp_to_next = 20
 	gs.starters = [0, 2, 4, 6]
 	
-	# Reseta a stamina de todos os jogadores da base para 100%
+	gs.reset_substitutions()
 	gs.reset_all_stamina()
 	gs._apply_lineup()
 	gs.possession = gs.Possession.PLAYER
@@ -111,5 +115,5 @@ static func reset_game(gs: Node) -> void:
 	gs.reset_match_stats()
 	MatchEngine.kickoff(gs, true)
 	
-	gs.push_log("Nova partida iniciada. A bola está com o %s." % gs.active_player()["name"])
+	gs.push_log("⚽ Apito Inicial: Começa o 1º Tempo! A bola está com o %s." % gs.active_player()["name"])
 	gs.state_changed.emit()

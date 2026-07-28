@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://bl44n4unc8ye6"]
 
-[ext_resource type="Script" uid="uid://ss5jrd6lhjdu" path="res://scenes/lineup_menu.gd" id="1_p1rhg"]
+[ext_resource type="Script" uid="uid://b13if5km7undl" path="res://scenes/lineup_menu.gd" id="1_p1rhg"]
 
-[node name="Control" type="Control" unique_id=1465178955]
+[node name="lineup_menu" type="Control" unique_id=1465178955]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
