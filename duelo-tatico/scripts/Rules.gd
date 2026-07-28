@@ -1,3 +1,4 @@
+class_name Rules
 extends RefCounted
 
 const BASE_BY_ZONE = [25, 35, 45, 55]

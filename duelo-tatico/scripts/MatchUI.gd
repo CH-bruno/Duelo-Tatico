@@ -136,10 +136,11 @@ func refresh() -> void:
 	long_shot_button.disabled = not in_final_third or GameState.match_over
 	long_shot_button.visible = in_final_third
 
-	var dri_chance = GameState.chance_for("DRI")
-	var feint_chance = GameState.feint_chance()
-	var sho_chance = GameState.chance_for("SHO") if in_box else 0
-	var long_shot_chance = GameState.long_shot_chance() if in_final_third else 0
+	# Consulta direta ao MatchEngine passando a instância do GameState
+	var dri_chance = MatchEngine.chance_for(GameState, "DRI")
+	var feint_chance = MatchEngine.feint_chance(GameState)
+	var sho_chance = MatchEngine.chance_for(GameState, "SHO") if in_box else 0
+	var long_shot_chance = MatchEngine.long_shot_chance(GameState) if in_final_third else 0
 
 	dri_button.text = "Drible (%d%%)" % dri_chance
 	feint_button.text = "Finta (%d%%)" % feint_chance
@@ -187,7 +188,8 @@ func rebuild_pass_buttons() -> void:
 		if i == GameState.active_idx:
 			continue
 		var teammate = GameState.squad[i]
-		var pass_chance = GameState.pass_chance_to(i)
+		# Consulta direta ao MatchEngine para probabilidade de passe
+		var pass_chance = MatchEngine.pass_chance_to(GameState, i)
 		var btn = Button.new()
 		btn.text = "Passar p/ %s (%d%%)" % [teammate["name"], pass_chance]
 		btn.modulate = color_for_chance(pass_chance)

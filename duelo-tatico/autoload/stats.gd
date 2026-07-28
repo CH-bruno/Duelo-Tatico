@@ -1,29 +1,74 @@
 extends Node
-# Autoload — estatísticas da partida atual. Separado do GameState pra
-# não misturar "o que está acontecendo no jogo" com "números pra tela
-# de resumo no fim da partida".
+# Stats.gd — Autoload de estatísticas da partida atual.
 
-var passes_attempted = 0
-var passes_completed = 0
+var passes_attempted: int = 0
+var passes_completed: int = 0
 
-var dribbles_attempted = 0
-var dribbles_completed = 0
+var dribbles_attempted: int = 0
+var dribbles_completed: int = 0
 
-var feints_attempted = 0
-var feints_completed = 0
+var feints_attempted: int = 0
+var feints_completed: int = 0
 
-var shots = 0
-var shots_on_target = 0
+var shots: int = 0
+var shots_on_target: int = 0
 
-var long_shots = 0
-var long_shots_on_target = 0
+var long_shots: int = 0
+var long_shots_on_target: int = 0
 
-var interceptions = 0
-var tackles = 0
-var blocks = 0
+var interceptions: int = 0
+var tackles: int = 0
+var blocks: int = 0
 
-var xp_gained_match = 0
+var xp_gained_match: int = 0
 
+
+# ---------- Mutadores / Ações Ataque ----------
+
+func pass_attempt() -> void:
+	passes_attempted += 1
+
+func pass_completed() -> void:
+	passes_completed += 1
+
+func dribble_attempt() -> void:
+	dribbles_attempted += 1
+
+func dribble_success() -> void:
+	dribbles_completed += 1
+
+func feint_attempt() -> void:
+	feints_attempted += 1
+
+func feint_success() -> void:
+	feints_completed += 1
+
+func shot() -> void:
+	shots += 1
+
+func shot_on_target() -> void:
+	shots_on_target += 1
+
+func long_shot_attempt() -> void:
+	long_shots += 1
+
+func long_shot_on_target() -> void:
+	long_shots_on_target += 1
+
+
+# ---------- Mutadores / Ações Defesa ----------
+
+func interception() -> void:
+	interceptions += 1
+
+func tackle() -> void:
+	tackles += 1
+
+func block() -> void:
+	blocks += 1
+
+
+# ---------- Reset e Exportação ----------
 
 func reset() -> void:
 	passes_attempted = 0
@@ -43,8 +88,6 @@ func reset() -> void:
 
 
 func to_dict() -> Dictionary:
-	# goals/turnovers/rounds continuam morando no GameState (fazem parte
-	# do estado da partida, não são só "estatística de resumo").
 	return {
 		"passes_attempted": passes_attempted,
 		"passes_completed": passes_completed,

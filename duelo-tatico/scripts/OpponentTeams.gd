@@ -57,7 +57,7 @@ static func team_for_stage(stage: int) -> Dictionary:
 
 static func team_for_challenge(wins: int) -> Dictionary:
 	var idx = wins % TEAMS.size()
-	var loops = wins / TEAMS.size()
+	var loops: int = int(float(wins) / TEAMS.size())
 	
 	# Faz uma cópia profunda para não alterar os dados originais
 	var base_team = TEAMS[idx].duplicate(true)

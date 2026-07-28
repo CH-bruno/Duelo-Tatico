@@ -1,3 +1,4 @@
+class_name Narration
 extends RefCounted
 
 const PASS_SUCCESS = [
