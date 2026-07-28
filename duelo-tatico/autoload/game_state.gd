@@ -10,6 +10,7 @@ const OpponentTeams = preload("res://scripts/OpponentTeams.gd")
 const ZONES = ["Campo Próprio", "Meio-Campo", "Terço Final", "Grande Área"]
 const MAX_CAMPAIGN_STAGE = 5
 const MAX_ROUNDS = 30
+var first_half: bool = true
 
 enum GameMode { CAMPAIGN, CHALLENGE }
 var game_mode = GameMode.CAMPAIGN

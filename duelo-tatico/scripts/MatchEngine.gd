@@ -248,22 +248,27 @@ static func kickoff(gs: Node, start_with_player: bool = true) -> void:
 
 static func advance_round(gs: Node) -> void:
 	gs.round_num += 1
+
+	# Gatilho do Intervalo (Rodada 15)
+	if gs.round_num == gs.MAX_ROUNDS / 2 and gs.first_half:
+		gs.first_half = false
+		MatchFlow.half_time(gs)
+		return
+
+	# Fim de Jogo (Rodada 30)
 	if gs.round_num >= gs.MAX_ROUNDS:
 		gs.match_over = true
 		SFX.play_whistle()
 		
-		gs._process_pending_xp()
+		Progression.process_pending_xp(gs)
 		
 		if gs.goals > gs.ai_goals:
 			gs.push_log("Vitória por %d × %d!" % [gs.goals, gs.ai_goals])
 			if gs.campaign_stage >= gs.MAX_CAMPAIGN_STAGE:
 				gs.push_log("PARABÉNS! Você venceu a Grande Final e completou a Campanha!")
-				gs.push_log("Clique em 'Menu' ou 'Nova Partida' para recomeçar.")
 			else:
 				gs.push_log("Clique em 'Próxima Partida' para continuar a campanha.")
 		elif gs.goals < gs.ai_goals:
 			gs.push_log("Derrota por %d × %d." % [gs.goals, gs.ai_goals])
-			gs.push_log("Sua campanha terminou. Clique em 'Nova Partida' para recomeçar.")
 		else:
 			gs.push_log("Empate em %d × %d." % [gs.goals, gs.ai_goals])
-			gs.push_log("Sua campanha terminou. Clique em 'Nova Partida' para recomeçar.")

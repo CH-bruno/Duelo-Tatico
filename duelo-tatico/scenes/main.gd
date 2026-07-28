@@ -1,5 +1,5 @@
 extends Control
-# Main.gd — Controlador principal da Partida (Fluxo, Sinais e Submódulos).
+# Main.gd — Controlador principal da Partida (Fluxo, Sinais, Intervalo e Submódulos).
 
 @onready var zone_label: Label = $VBoxContainer/ZoneLabel
 @onready var stats_label: Label = $VBoxContainer/StatsLabel
@@ -21,6 +21,7 @@ extends Control
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const OptionsMenuScene = preload("res://scenes/OptionsMenu.tscn")
 const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
+const HalftimeDialogScript = preload("res://scenes/HalftimeDialog.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var _last_goals = 0
@@ -114,11 +115,32 @@ func refresh_ui():
 		show_match_stats()
 
 
-func _on_match_event(event_name: String, _details: Dictionary):
-	if event_name == "YELLOW_CARD":
-		match_anims.flash(AppTheme.WARNING)
-	elif event_name == "FOUL":
-		match_anims.flash(Color(0.8, 0.8, 0.8, 0.3))
+func _on_match_event(event_name: String, details: Dictionary):
+	match event_name:
+		"HALF_TIME":
+			_show_halftime_dialog(details)
+		"YELLOW_CARD":
+			match_anims.flash(AppTheme.WARNING)
+		"FOUL":
+			match_anims.flash(Color(0.8, 0.8, 0.8, 0.3))
+
+
+func _show_halftime_dialog(details: Dictionary) -> void:
+	if has_node("HalftimeDialog"):
+		return
+
+	# Agora herdamos de ColorRect (Overlay)
+	var dialog = ColorRect.new()
+	dialog.name = "HalftimeDialog"
+	dialog.set_script(HalftimeDialogScript)
+	add_child(dialog)
+
+	# Chama a configuração
+	dialog.setup(details)
+
+	dialog.continued.connect(func():
+		refresh_ui()
+	)
 
 
 func show_match_stats():

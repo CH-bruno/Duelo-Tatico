@@ -55,6 +55,31 @@ static func next_challenge_round(gs: Node) -> void:
 	SFX.play_whistle()
 	gs.state_changed.emit()
 
+static func half_time(gs: Node) -> void:
+	SFX.play_whistle()
+	gs.push_log("⏱ Apito do árbitro: Fim do Primeiro Tempo!")
+
+	# 1. Recuperação parcial de stamina no vestiário (entre 8 e 14)
+	for i in range(gs.starters.size()):
+		var roster_idx = gs.starters[i]
+		var current_st = gs.get_stamina(roster_idx)
+		var recovery = randf_range(8.0, 14.0)
+		gs.set_stamina(roster_idx, current_st + recovery)
+
+	# 2. Reset de momentum e streak
+	gs.momentum_bonus = 0
+	gs.ai_momentum = 0
+	gs.streak = 0
+
+	# 3. Dá o pontapé inicial do 2º Tempo com o Rival (Mudança de Posse)
+	MatchEngine.kickoff(gs, false)
+
+	# 4. Notifica a Interface sobre o Intervalo
+	gs.emit_match_event("HALF_TIME", {
+		"goals": gs.goals,
+		"ai_goals": gs.ai_goals,
+		"stage": gs.difficulty_stage()
+	})
 
 static func reset_game(gs: Node) -> void:
 	gs.level = 1

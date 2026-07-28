@@ -1,13 +1,11 @@
 extends Control
-# PitchView.gd — Renderizador 2D do Campo, Arquibancada (Flashes/Penumbra), Jogadores e Bola.
+# PitchView.gd — Renderizador 2D do Campo, Arquibancada, Jogadores, Bola e Inversão de Lados no 2º Tempo.
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
-#
 # ===========================
-#          CORES
+#           CORES
 # ===========================
-#
 const GRASS_LIGHT = Color("#4caf50")
 const GRASS_DARK  = Color("#3e9142")
 
@@ -25,11 +23,9 @@ const ENEMY_BORDER = Color("#5d1111")
 const BALL_COLOR = AppTheme.TEXT_COLOR
 const BALL_SHADOW = Color(0, 0, 0, 0.35)
 
-#
 # ===========================
-#        ANIMAÇÕES
+#         ANIMAÇÕES
 # ===========================
-#
 var visual_column := 0.0
 var pulse_alpha := 0.75
 var ball_rotation := 0.0
@@ -47,7 +43,7 @@ func _ready():
 	AI_GLOW.a = 0.16
 
 	GameState.state_changed.connect(_on_state_changed)
-	visual_column = float(GameState.zone_idx)
+	visual_column = float(_target_column())
 	_start_pulse()
 	set_process(true)
 
@@ -68,19 +64,21 @@ func _process(delta):
 	queue_redraw()
 
 
-#
 # ===========================
-#     MUDANÇA DE POSSE
+#     CÁLCULO DE COLUNAS
 # ===========================
-#
-func _on_state_changed():
+func _target_column() -> int:
 	var ai_has_ball = GameState.possession == GameState.Possession.AI
+	var raw_column = GameState.ai_active_column() if ai_has_ball else GameState.zone_idx
 
-	var target = float(
-		GameState.ai_active_column()
-		if ai_has_ball
-		else GameState.zone_idx
-	)
+	# Se for 2º tempo (first_half = false), inverte horizontalmente as colunas (0->3, 1->2, etc.)
+	if not GameState.first_half:
+		return 3 - raw_column
+	return raw_column
+
+
+func _on_state_changed():
+	var target = float(_target_column())
 
 	if is_equal_approx(target, visual_column):
 		queue_redraw()
@@ -130,11 +128,9 @@ func _set_pulse(v):
 	queue_redraw()
 
 
-#
 # ===========================
 #        ARQUIBANCADA
 # ===========================
-#
 func _draw_crowd(h: float):
 	draw_rect(Rect2(0, 0, size.x, h), Color("#1a1a24"))
 	draw_rect(Rect2(0, size.y - h, size.x, h), Color("#1a1a24"))
@@ -153,11 +149,9 @@ func _draw_crowd(h: float):
 		draw_circle(flash_pos, 6.0, Color(1, 1, 1, flash_alpha * 0.4))
 
 
-#
 # ===========================
 #            DRAW
 # ===========================
-#
 func _draw_player(pos: Vector2, color: Color, border: Color):
 	draw_circle(pos + Vector2(2, 3), 11, Color(0, 0, 0, 0.25))
 	draw_circle(pos, 10, border)
@@ -178,7 +172,7 @@ func _draw():
 	var zone_count = GameState.ZONES.size()
 	var zone_width = size.x / zone_count
 	var mid_y = size.y / 2.0
-	
+
 	var font = ThemeDB.fallback_font
 	var font_size = 13
 
@@ -268,10 +262,10 @@ func _draw():
 
 	# ===== 8. JOGADORES =====
 	var ai_has_ball = GameState.possession == GameState.Possession.AI
-	var active_column = GameState.ai_active_column() if ai_has_ball else GameState.zone_idx
+	var active_column = _target_column()
+	var is_first_half = GameState.first_half
 
 	for i in range(zone_count):
-
 		if i == active_column:
 			draw_rect(
 				Rect2(
@@ -283,20 +277,29 @@ func _draw():
 				AI_GLOW if ai_has_ball else ACTIVE_GLOW
 			)
 
-		var attacker = GameState.team_player_at_column(i, !ai_has_ball)
-		var defender = GameState.team_player_at_column(i, ai_has_ball)
+		# Mapeamento do jogador conforme o tempo do jogo
+		var logic_zone = i if is_first_half else (3 - i)
+		var attacker = GameState.team_player_at_column(logic_zone, !ai_has_ball)
+		var defender = GameState.team_player_at_column(logic_zone, ai_has_ball)
 
 		var px = i * zone_width + zone_width / 2.0
 
 		var top = Vector2(px, 85)
 		var bottom = Vector2(px, size.y - 85)
 
+		# No 1º Tempo: Player em cima, IA embaixo
+		# No 2º Tempo: Troca os lados verticais para refletir a mudança de campo
+		var top_color = PLAYER_COLOR if is_first_half else ENEMY_COLOR
+		var top_border = PLAYER_BORDER if is_first_half else ENEMY_BORDER
+		var bottom_color = ENEMY_COLOR if is_first_half else PLAYER_COLOR
+		var bottom_border = ENEMY_BORDER if is_first_half else PLAYER_BORDER
+
 		if ai_has_ball:
-			_draw_player(top, ENEMY_COLOR, ENEMY_BORDER)
-			_draw_player(bottom, PLAYER_COLOR, PLAYER_BORDER)
+			_draw_player(top, bottom_color, bottom_border)
+			_draw_player(bottom, top_color, top_border)
 		else:
-			_draw_player(top, PLAYER_COLOR, PLAYER_BORDER)
-			_draw_player(bottom, ENEMY_COLOR, ENEMY_BORDER)
+			_draw_player(top, top_color, top_border)
+			_draw_player(bottom, bottom_color, bottom_border)
 
 		draw_string(font, Vector2(px - 45, 108), attacker["role"], HORIZONTAL_ALIGNMENT_CENTER, 90, font_size, AppTheme.TEXT_COLOR)
 		draw_string(font, Vector2(px - 45, 124), attacker["name"], HORIZONTAL_ALIGNMENT_CENTER, 90, 11, AppTheme.TEXT_COLOR)
@@ -317,6 +320,15 @@ func _draw():
 
 	# ===== 9. BOLA =====
 	var ball_x = visual_column * zone_width + zone_width / 2.0
-	var ball_y = 150 if !ai_has_ball else size.y - 150
+	
+	# Inverte a linha vertical da bola no 2º tempo conforme a posse
+	var ball_y_top = 150
+	var ball_y_bottom = size.y - 150
+	var ball_y = 0.0
+
+	if is_first_half:
+		ball_y = ball_y_top if !ai_has_ball else ball_y_bottom
+	else:
+		ball_y = ball_y_bottom if !ai_has_ball else ball_y_top
 
 	_draw_ball(Vector2(ball_x, ball_y))

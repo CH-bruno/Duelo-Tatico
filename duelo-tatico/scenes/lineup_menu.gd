@@ -1,5 +1,5 @@
 extends Control
-# LineupMenu.gd — Prancha Tática & Escalação (Layout Ajustado com Scroll e Substituição Inline)
+# LineupMenu.gd — Prancha Tática & Escalação (Cards de Comparativo Lado a Lado)
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
@@ -11,11 +11,7 @@ var selected_candidate_idx: int = -1
 var pitch_view: Control
 var back_button: Button
 var confirm_button: Button
-var player_name_label: Label
-var player_role_label: Label
-var player_trait_label: Label
-var stamina_label: Label
-var stats_container: VBoxContainer
+var comparison_container: VBoxContainer
 var swap_button: Button
 var bench_container: VBoxContainer
 
@@ -37,7 +33,7 @@ class PitchView extends Control:
 		draw_rect(size_rect, Color(0.06, 0.11, 0.08), true)
 		draw_rect(size_rect, AppTheme.GOLD.darkened(0.4), false, 2.0)
 
-		# Linhas
+		# Linhas do Campo
 		var center_y = size.y / 2.0
 		var center_x = size.x / 2.0
 		var line_color = Color(1.0, 1.0, 1.0, 0.15)
@@ -69,7 +65,6 @@ class PitchView extends Control:
 			draw_circle(pos, 17, circle_color)
 			draw_arc(pos, 17, 0, TAU, 24, border_color, 2.0)
 
-			# Texto Centralizado
 			var role_code = RosterData.ROLES[i]
 			var str_size = font.get_string_size(role_code, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
 			var text_pos = pos + Vector2(-str_size.x / 2.0, font.get_ascent(font_size) / 2.0 - 1.0)
@@ -77,11 +72,9 @@ class PitchView extends Control:
 			
 			draw_string(font, text_pos, role_code, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, text_color)
 
-			# Nome
 			var p_name = GameState.squad[i]["name"] if i < GameState.squad.size() else ""
 			draw_string(font, pos + Vector2(-40, -22), p_name, HORIZONTAL_ALIGNMENT_CENTER, 80, 11, AppTheme.TEXT_COLOR)
 
-			# Stamina
 			var stamina_color = AppTheme.SUCCESS if stamina_pct > 70 else (AppTheme.WARNING if stamina_pct > 35 else AppTheme.DANGER)
 			var bar_w = 44.0
 			var bg_bar_rect = Rect2(pos.x - bar_w / 2.0, pos.y + 21, bar_w, 4)
@@ -165,9 +158,9 @@ func _build_ui_layout():
 	pitch_view = PitchView.new(self)
 	content_hbox.add_child(pitch_view)
 
-	# Lado Direito: Container com Barra de Rolagem
+	# Lado Direito: Container de Cards e Banco
 	var scroll = ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(350, 0)
+	scroll.custom_minimum_size = Vector2(380, 0)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	content_hbox.add_child(scroll)
 
@@ -176,47 +169,9 @@ func _build_ui_layout():
 	right_vbox.add_theme_constant_override("separation", 8)
 	scroll.add_child(right_vbox)
 
-	var card_style = StyleBoxFlat.new()
-	card_style.bg_color = AppTheme.PANEL
-	card_style.border_color = AppTheme.GOLD.darkened(0.3)
-	card_style.set_border_width_all(1)
-	card_style.set_corner_radius_all(6)
-	card_style.set_content_margin_all(8)
-
-	# Card do Jogador / Comparativo
-	var player_card = PanelContainer.new()
-	player_card.add_theme_stylebox_override("panel", card_style)
-
-	var card_vbox = VBoxContainer.new()
-	card_vbox.add_theme_constant_override("separation", 2)
-	player_card.add_child(card_vbox)
-
-	player_name_label = Label.new()
-	player_name_label.add_theme_font_size_override("font_size", 15)
-	player_name_label.add_theme_color_override("font_color", AppTheme.GOLD)
-	card_vbox.add_child(player_name_label)
-
-	player_role_label = Label.new()
-	player_role_label.add_theme_font_size_override("font_size", 12)
-	card_vbox.add_child(player_role_label)
-
-	player_trait_label = Label.new()
-	player_trait_label.add_theme_font_size_override("font_size", 12)
-	player_trait_label.add_theme_color_override("font_color", Color(0.9, 0.85, 0.4))
-	card_vbox.add_child(player_trait_label)
-
-	stamina_label = Label.new()
-	stamina_label.add_theme_font_size_override("font_size", 12)
-	card_vbox.add_child(stamina_label)
-
-	var sep = HSeparator.new()
-	card_vbox.add_child(sep)
-
-	# Container flexível para estatísticas do titular OU comparativo
-	stats_container = VBoxContainer.new()
-	card_vbox.add_child(stats_container)
-
-	right_vbox.add_child(player_card)
+	# Área do Comparativo de Cards
+	comparison_container = VBoxContainer.new()
+	right_vbox.add_child(comparison_container)
 
 	# Botão de Troca
 	swap_button = Button.new()
@@ -228,6 +183,13 @@ func _build_ui_layout():
 	right_vbox.add_child(swap_button)
 
 	# Card do Banco de Reservas
+	var card_style = StyleBoxFlat.new()
+	card_style.bg_color = AppTheme.PANEL
+	card_style.border_color = AppTheme.GOLD.darkened(0.3)
+	card_style.set_border_width_all(1)
+	card_style.set_corner_radius_all(6)
+	card_style.set_content_margin_all(8)
+
 	var bench_card = PanelContainer.new()
 	bench_card.add_theme_stylebox_override("panel", card_style)
 
@@ -256,58 +218,40 @@ func _on_confirm_pressed():
 func _refresh_ui():
 	if pitch_view:
 		pitch_view.queue_redraw()
-	_update_inspector_and_comparison()
+	_update_comparison_cards()
 	_update_bench_list()
 
 
-func _update_inspector_and_comparison():
+func _update_comparison_cards():
+	for child in comparison_container.get_children():
+		child.queue_free()
+
 	if selected_role_idx < 0 or selected_role_idx >= GameState.squad.size():
 		return
 
 	var starter_roster_idx = GameState.starters[selected_role_idx]
-	var player = GameState.squad[selected_role_idx]
-	var stamina = GameState.get_stamina(starter_roster_idx)
+	var starter = GameState.squad[selected_role_idx]
+	var starter_stamina = GameState.get_stamina(starter_roster_idx)
 
-	player_name_label.text = "%s [TITULAR]" % player["name"]
-	player_role_label.text = "Posição: %s" % player["role"]
-	player_trait_label.text = "★ %s" % RosterData.trait_name(player["trait"])
-	stamina_label.text = "⚡ Energia: %d%%" % int(stamina)
+	var cards_hbox = HBoxContainer.new()
+	cards_hbox.add_theme_constant_override("separation", 8)
+	cards_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
-	for child in stats_container.get_children():
-		child.queue_free()
+	# --- CARD 1: TITULAR ---
+	var card_starter = _create_player_card(
+		starter["name"] + " [TITULAR]",
+		starter["role"],
+		RosterData.trait_name(starter["trait"]),
+		starter_stamina,
+		starter,
+		AppTheme.GOLD,
+		null # Sem comparação de atributos, é a base
+	)
+	card_starter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards_hbox.add_child(card_starter)
 
-	# Se nenhum reserva estiver selecionado, exibe a lista simples do Titular
-	if selected_candidate_idx == -1:
-		var grid = GridContainer.new()
-		grid.columns = 2
-
-		var stats_to_show = [
-			["Passe (PAS)", player["PAS"]],
-			["Drible (DRI)", player["DRI"]],
-			["Chute (SHO)", player["SHO"]],
-			["Intercept. (INT)", player["INT"]],
-			["Desarme (TAC)", player["TAC"]],
-			["Bloqueio (BLQ)", player["BLQ"]]
-		]
-
-		for stat in stats_to_show:
-			var lbl_name = Label.new()
-			lbl_name.text = stat[0]
-			lbl_name.add_theme_font_size_override("font_size", 11)
-
-			var lbl_val = Label.new()
-			lbl_val.text = str(stat[1])
-			lbl_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			lbl_val.add_theme_font_size_override("font_size", 11)
-			lbl_val.add_theme_color_override("font_color", AppTheme.GOLD)
-
-			grid.add_child(lbl_name)
-			grid.add_child(lbl_val)
-
-		stats_container.add_child(grid)
-
-	# Se um reserva estiver selecionado, substitui a lista pelo COMPARATIVO
-	else:
+	# --- CARD 2: RESERVA (Se Houver Selecionado) ---
+	if selected_candidate_idx != -1:
 		var candidate_raw = RosterData.ROSTER[selected_candidate_idx]
 		var candidate_stamina = GameState.get_stamina(selected_candidate_idx)
 
@@ -316,63 +260,100 @@ func _update_inspector_and_comparison():
 		elif candidate_stamina < 75.0: st_mult = 0.90
 
 		var growth = GameState.level - 1
-		var c_pas = min(95, int(round((candidate_raw["PAS"] + 2 * growth) * st_mult)))
-		var c_dri = min(95, int(round((candidate_raw["DRI"] + 2 * growth) * st_mult)))
-		var c_sho = min(95, int(round((candidate_raw["SHO"] + 3 * growth) * st_mult)))
-		var c_int = min(95, int(round((candidate_raw["INT"] + 2 * growth) * st_mult)))
-		var c_tac = min(95, int(round((candidate_raw["TAC"] + 2 * growth) * st_mult)))
-		var c_blq = min(95, int(round((candidate_raw["BLQ"] + 2 * growth) * st_mult)))
+		var candidate_stats = {
+			"PAS": min(95, int(round((candidate_raw["PAS"] + 2 * growth) * st_mult))),
+			"DRI": min(95, int(round((candidate_raw["DRI"] + 2 * growth) * st_mult))),
+			"SHO": min(95, int(round((candidate_raw["SHO"] + 3 * growth) * st_mult))),
+			"INT": min(95, int(round((candidate_raw["INT"] + 2 * growth) * st_mult))),
+			"TAC": min(95, int(round((candidate_raw["TAC"] + 2 * growth) * st_mult))),
+			"BLQ": min(95, int(round((candidate_raw["BLQ"] + 2 * growth) * st_mult)))
+		}
 
-		var header_lbl = Label.new()
-		header_lbl.text = "VS RESERVA: %s (%d%% ⚡)" % [candidate_raw["name"], int(candidate_stamina)]
-		header_lbl.add_theme_font_size_override("font_size", 11)
-		header_lbl.add_theme_color_override("font_color", AppTheme.GOLD)
-		stats_container.add_child(header_lbl)
+		var card_candidate = _create_player_card(
+			candidate_raw["name"] + " [RESERVA]",
+			RosterData.ROLES[selected_role_idx],
+			RosterData.trait_name(candidate_raw["trait"]),
+			candidate_stamina,
+			candidate_stats,
+			AppTheme.SUCCESS,
+			starter # Passa os atributos do titular para calcular diferenças (+ / -)
+		)
+		card_candidate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cards_hbox.add_child(card_candidate)
 
-		var grid = GridContainer.new()
-		grid.columns = 3
+	comparison_container.add_child(cards_hbox)
 
-		var stats_comp = [
-			["PAS", player["PAS"], c_pas],
-			["DRI", player["DRI"], c_dri],
-			["SHO", player["SHO"], c_sho],
-			["INT", player["INT"], c_int],
-			["TAC", player["TAC"], c_tac],
-			["BLQ", player["BLQ"], c_blq],
-		]
 
-		for item in stats_comp:
-			var stat_code = item[0]
-			var val_start = item[1]
-			var val_cand = item[2]
-			var diff = val_cand - val_start
+func _create_player_card(p_name: String, role: String, trait_str: String, stamina: float, stats: Dictionary, border_color: Color, base_stats) -> PanelContainer:
+	var card_style = StyleBoxFlat.new()
+	card_style.bg_color = AppTheme.PANEL
+	card_style.border_color = border_color
+	card_style.set_border_width_all(2 if base_stats != null else 1)
+	card_style.set_corner_radius_all(6)
+	card_style.set_content_margin_all(8)
 
-			var lbl_attr = Label.new()
-			lbl_attr.text = stat_code
-			lbl_attr.add_theme_font_size_override("font_size", 11)
+	var panel = PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", card_style)
 
-			var lbl_old = Label.new()
-			lbl_old.text = str(val_start)
-			lbl_old.add_theme_font_size_override("font_size", 11)
+	var vbox = VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	panel.add_child(vbox)
 
-			var lbl_diff = Label.new()
+	var lbl_name = Label.new()
+	lbl_name.text = p_name
+	lbl_name.add_theme_font_size_override("font_size", 12)
+	lbl_name.add_theme_color_override("font_color", border_color)
+	vbox.add_child(lbl_name)
+
+	var lbl_info = Label.new()
+	lbl_info.text = "%s  │  ★ %s" % [role, trait_str]
+	lbl_info.add_theme_font_size_override("font_size", 10)
+	vbox.add_child(lbl_info)
+
+	var lbl_stamina = Label.new()
+	lbl_stamina.text = "⚡ Energia: %d%%" % int(stamina)
+	lbl_stamina.add_theme_font_size_override("font_size", 10)
+	vbox.add_child(lbl_stamina)
+
+	vbox.add_child(HSeparator.new())
+
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var stat_list = ["PAS", "DRI", "SHO", "INT", "TAC", "BLQ"]
+
+	for code in stat_list:
+		var lbl_code = Label.new()
+		lbl_code.text = code
+		lbl_code.add_theme_font_size_override("font_size", 11)
+
+		var val = stats[code]
+		var lbl_val = Label.new()
+		lbl_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		lbl_val.add_theme_font_size_override("font_size", 11)
+
+		# Se for o Card do Reserva, compara os valores com os do Titular
+		if base_stats != null:
+			var diff = val - base_stats[code]
 			if diff > 0:
-				lbl_diff.text = "➔ %d (+%d) 🟢" % [val_cand, diff]
-				lbl_diff.add_theme_color_override("font_color", AppTheme.SUCCESS)
+				lbl_val.text = "%d (+%d) 🟢" % [val, diff]
+				lbl_val.add_theme_color_override("font_color", AppTheme.SUCCESS)
 			elif diff < 0:
-				lbl_diff.text = "➔ %d (%d) 🔴" % [val_cand, diff]
-				lbl_diff.add_theme_color_override("font_color", AppTheme.DANGER)
+				lbl_val.text = "%d (%d) 🔴" % [val, diff]
+				lbl_val.add_theme_color_override("font_color", AppTheme.DANGER)
 			else:
-				lbl_diff.text = "➔ %d (=)" % val_cand
-				lbl_diff.add_theme_color_override("font_color", AppTheme.TEXT_COLOR)
+				lbl_val.text = "%d (=)" % val
+				lbl_val.add_theme_color_override("font_color", AppTheme.TEXT_COLOR)
+		else:
+			lbl_val.text = str(val)
+			lbl_val.add_theme_color_override("font_color", AppTheme.GOLD)
 
-			lbl_diff.add_theme_font_size_override("font_size", 11)
+		grid.add_child(lbl_code)
+		grid.add_child(lbl_val)
 
-			grid.add_child(lbl_attr)
-			grid.add_child(lbl_old)
-			grid.add_child(lbl_diff)
-
-		stats_container.add_child(grid)
+	vbox.add_child(grid)
+	return panel
 
 
 func _update_bench_list():

@@ -67,21 +67,39 @@ static func _choose_move() -> void:
 	GameState.ai_active_idx = GameState.ai_zone_idx
 	var player = GameState.ai_active_player()
 
+	# Postura Tática da IA no 2º Tempo
+	var ai_losing = GameState.ai_goals < GameState.goals
+	var ai_winning = GameState.ai_goals > GameState.goals
+
 	match player["role"]:
 		"ZAG":
-			GameState.ai_next_move = GameState.AIMove.PASS
-		"VOL":
-			GameState.ai_next_move = GameState.AIMove.PASS if randi() % 100 < 75 else GameState.AIMove.DRIBBLE
-		"MEI":
-			var r = randi() % 100
-			if r < 35:
-				GameState.ai_next_move = GameState.AIMove.PASS
-			elif r < 80:
+			if ai_losing and not GameState.first_half and randi() % 100 < 35:
 				GameState.ai_next_move = GameState.AIMove.DRIBBLE
 			else:
-				GameState.ai_next_move = GameState.AIMove.LONG_SHOT
+				GameState.ai_next_move = GameState.AIMove.PASS
+
+		"VOL":
+			if ai_winning:
+				GameState.ai_next_move = GameState.AIMove.PASS
+			else:
+				GameState.ai_next_move = GameState.AIMove.PASS if randi() % 100 < 65 else GameState.AIMove.DRIBBLE
+
+		"MEI":
+			var r = randi() % 100
+			if ai_losing and not GameState.first_half:
+				if r < 20: GameState.ai_next_move = GameState.AIMove.PASS
+				elif r < 60: GameState.ai_next_move = GameState.AIMove.DRIBBLE
+				else: GameState.ai_next_move = GameState.AIMove.LONG_SHOT
+			else:
+				if r < 35: GameState.ai_next_move = GameState.AIMove.PASS
+				elif r < 80: GameState.ai_next_move = GameState.AIMove.DRIBBLE
+				else: GameState.ai_next_move = GameState.AIMove.LONG_SHOT
+
 		"CA":
-			GameState.ai_next_move = GameState.AIMove.SHOT if GameState.ai_zone_idx >= 2 else GameState.AIMove.DRIBBLE
+			if GameState.ai_zone_idx >= 1 and ai_losing:
+				GameState.ai_next_move = GameState.AIMove.SHOT
+			else:
+				GameState.ai_next_move = GameState.AIMove.SHOT if GameState.ai_zone_idx >= 2 else GameState.AIMove.DRIBBLE
 
 
 static func resolve_shot(bonus: int = 0) -> void:
