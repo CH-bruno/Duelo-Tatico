@@ -148,9 +148,14 @@ static func defend(action: String) -> void:
 	if GameState.turn_state != GameState.TurnState.PLAYER_DEFENSE:
 		return
 
+	var defender_idx = GameState.defender_for_attacker()
+	var defender_roster_idx = GameState.starters[defender_idx]
+
 	var chance = defense_chance(action)
 	var success = randi_range(1, 100) <= chance
-	var defender_idx = GameState.defender_for_attacker()
+
+	# Consumo pós-ação defensiva
+	GameState.consume_action_stamina(defender_roster_idx, action, success, true)
 
 	if success:
 		match action:
@@ -174,7 +179,6 @@ static func defend(action: String) -> void:
 
 	MatchEngine.advance_round(GameState)
 	GameState.state_changed.emit()
-
 
 static func _matches_move(defense_type: String, move) -> bool:
 	match defense_type:

@@ -34,7 +34,7 @@ var match_anims: MatchAnimations
 
 func _ready():
 	theme = AppTheme.build()
-	SFX.play_music("res://audio/music_match.mp3")
+	SFX.play_music("res://assets/audio/music_match.mp3")
 	SFX.play_whistle()
 
 	_init_submodules()

@@ -1,9 +1,6 @@
 class_name MatchEngine
 extends Node
 
-const Narration = preload("res://scripts/Narration.gd")
-const Rules = preload("res://scripts/Rules.gd")
-
 # ---------- Ações do Jogador ----------
 
 static func attempt(gs: Node, action: String, target_idx: int = -1) -> void:
@@ -29,11 +26,15 @@ static func attempt(gs: Node, action: String, target_idx: int = -1) -> void:
 
 
 static func _do_shot(gs: Node) -> void:
+	var active_roster_idx = gs.starters[gs.active_idx]
 	var passer = gs.active_player()
 	Stats.shot()
 	
 	var succ_chance = chance_for(gs, "SHO")
 	var success = randi_range(1, 100) <= succ_chance
+
+	# Consumo de stamina proporcional ao tipo de ação e resultado
+	gs.consume_action_stamina(active_roster_idx, "SHO", success)
 
 	if success:
 		Stats.shot_on_target()
@@ -52,11 +53,15 @@ static func _do_shot(gs: Node) -> void:
 
 
 static func _do_dribble(gs: Node) -> void:
+	var active_roster_idx = gs.starters[gs.active_idx]
 	var passer = gs.active_player()
 	Stats.dribble_attempt()
 	
 	var succ_chance = chance_for(gs, "DRI")
 	var success = randi_range(1, 100) <= succ_chance
+
+	# Consumo de stamina proporcional ao tipo de ação e resultado
+	gs.consume_action_stamina(active_roster_idx, "DRI", success)
 
 	if success:
 		Stats.dribble_success()
@@ -75,11 +80,15 @@ static func _do_dribble(gs: Node) -> void:
 
 
 static func _do_feint(gs: Node) -> void:
+	var active_roster_idx = gs.starters[gs.active_idx]
 	var passer = gs.active_player()
 	Stats.feint_attempt()
 	
 	var succ_chance = feint_chance(gs)
 	var success = randi_range(1, 100) <= succ_chance
+
+	# Consumo de stamina proporcional ao tipo de ação e resultado
+	gs.consume_action_stamina(active_roster_idx, "FEINT", success)
 
 	if success:
 		Stats.feint_success()
@@ -96,11 +105,15 @@ static func _do_feint(gs: Node) -> void:
 
 
 static func _do_long_shot(gs: Node) -> void:
+	var active_roster_idx = gs.starters[gs.active_idx]
 	var passer = gs.active_player()
 	Stats.long_shot_attempt()
 	
 	var succ_chance = long_shot_chance(gs)
 	var success = randi_range(1, 100) <= succ_chance
+
+	# Consumo de stamina proporcional ao tipo de ação e resultado
+	gs.consume_action_stamina(active_roster_idx, "LONG_SHO", success)
 
 	if success:
 		Stats.long_shot_on_target()
@@ -122,12 +135,16 @@ static func _do_pass(gs: Node, target_idx: int) -> void:
 	if target_idx < 0 or target_idx >= gs.squad.size() or target_idx == gs.active_idx:
 		return
 		
+	var active_roster_idx = gs.starters[gs.active_idx]
 	var passer = gs.active_player()
 	var target = gs.squad[target_idx]
 	
 	Stats.pass_attempt()
 	var succ_chance = pass_chance_to(gs, target_idx)
 	var success = randi_range(1, 100) <= succ_chance
+
+	# Consumo de stamina proporcional ao tipo de ação e resultado
+	gs.consume_action_stamina(active_roster_idx, "PASS", success)
 
 	if success:
 		Stats.pass_completed()
@@ -248,6 +265,9 @@ static func kickoff(gs: Node, start_with_player: bool = true) -> void:
 
 static func advance_round(gs: Node) -> void:
 	gs.round_num += 1
+
+	# Desgaste passivo por posição a cada rodada
+	gs.consume_round_stamina()
 
 	# Gatilho do Intervalo (Rodada 15)
 	if gs.round_num == gs.MAX_ROUNDS / 2 and gs.first_half:

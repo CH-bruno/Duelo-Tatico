@@ -15,7 +15,7 @@ var ball_direction: int = 1
 
 func _ready():
 	theme = AppTheme.build()
-	SFX.play_music("res://audio/music_menu.mp3")
+	SFX.play_music("res://assets/audio/music_menu.mp3")
 
 	continue_button.visible = SaveSystem.has_save()
 	continue_button.pressed.connect(_on_continue_pressed)

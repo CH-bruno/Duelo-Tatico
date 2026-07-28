@@ -1,49 +1,114 @@
 class_name LineupManager
 extends Node
 
-static func init_stamina(player_stamina: Dictionary) -> void:
-	player_stamina.clear()
+# Custos Base por Ação de Ataque (Suavizados)
+const ACTION_STAMINA = {
+	"PASS": 0.8,
+	"DRI": 1.8,
+	"FEINT": 1.5,
+	"SHO": 2.0,
+	"LONG_SHO": 2.5
+}
+
+# Custos Base por Ação de Defesa
+const DEFENSE_STAMINA = {
+	"INTERCEPT": 1.2,
+	"TACKLE": 1.8,
+	"BLOCK": 1.5
+}
+
+# Custo Passivo por Posição a cada Rodada (Rebalanceado para equilibrar MEI e CA)
+const POSITION_ROUND_COST = {
+	"ZAG": 0.8,
+	"VOL": 0.9,
+	"MEI": 0.9,
+	"CA": 0.8
+}
+
+# Initialize Stamina
+static func init_stamina(stamina_dict: Dictionary) -> void:
 	for i in range(RosterData.ROSTER.size()):
-		player_stamina[i] = 100.0
+		if not stamina_dict.has(i):
+			stamina_dict[i] = 100.0
 
 
-static func consume_starter_stamina(gs: Node, cost: float = 12.0) -> void:
-	for idx in gs.starters:
-		var current = gs.get_stamina(idx)
-		gs.set_stamina(idx, current - cost)
-
-
-static func apply_match_fatigue(player_stamina: Dictionary, starters: Array) -> void:
+# Reseta a stamina de TODO o elenco para 100%
+static func reset_all_stamina(stamina_dict: Dictionary) -> void:
 	for i in range(RosterData.ROSTER.size()):
-		if not player_stamina.has(i):
-			player_stamina[i] = 100.0
+		stamina_dict[i] = 100.0
 
-		if i in starters:
-			player_stamina[i] = maxf(30.0, player_stamina[i] - 20.0)
+
+# Consumo Passivo por Rodada (baseado na Posição do jogador)
+static func consume_round_stamina(gs: Node) -> void:
+	for i in range(gs.starters.size()):
+		var roster_idx = gs.starters[i]
+		var role = RosterData.ROLES[i]
+		var base_cost = POSITION_ROUND_COST.get(role, 0.8)
+		
+		# Variação sutil (0.95 a 1.05)
+		var actual_cost = base_cost * randf_range(0.95, 1.05)
+		var current = gs.get_stamina(roster_idx)
+		gs.set_stamina(roster_idx, current - actual_cost)
+
+
+# Consumo Ativo por Ação
+static func consume_action_stamina(gs: Node, roster_idx: int, action: String, success: bool, is_defense: bool = false) -> void:
+	var base_cost = 0.0
+	
+	if is_defense:
+		base_cost = DEFENSE_STAMINA.get(action, 1.5)
+	else:
+		base_cost = ACTION_STAMINA.get(action, 1.5)
+
+	# Se falhou, gasta menos energia
+	var success_multiplier = 1.0 if success else 0.5
+	var final_cost = base_cost * success_multiplier
+
+	var current = gs.get_stamina(roster_idx)
+	gs.set_stamina(roster_idx, current - final_cost)
+
+
+# Recuperação do Intervalo Fortalecida
+static func process_halftime_recovery(gs: Node) -> void:
+	for roster_idx in gs.starters:
+		var current = gs.get_stamina(roster_idx)
+		
+		# Boost para quem está cansadão (<60%)
+		var recovery = 0.0
+		if current < 60.0:
+			recovery = randf_range(16.0, 22.0)
+		elif current < 80.0:
+			recovery = randf_range(10.0, 15.0)
 		else:
-			player_stamina[i] = minf(100.0, player_stamina[i] + 30.0)
+			recovery = randf_range(5.0, 8.0)
+
+		gs.set_stamina(roster_idx, current + recovery)
+
+
+static func apply_match_fatigue(_stamina_dict: Dictionary, _starters: Array) -> void:
+	pass
 
 
 static func apply_lineup(gs: Node) -> Array:
-	var growth_levels = gs.level - 1
-	var new_squad = []
-	
-	for idx in gs.starters:
-		var p = RosterData.ROSTER[idx].duplicate()
-		var stamina_val = gs.get_stamina(idx)
-		
-		var stamina_mult = 1.0
-		if stamina_val < 50.0:
-			stamina_mult = 0.80
-		elif stamina_val < 75.0:
-			stamina_mult = 0.90
-		
-		p["PAS"] = min(95, int(round((p["PAS"] + 2 * growth_levels) * stamina_mult)))
-		p["DRI"] = min(95, int(round((p["DRI"] + 2 * growth_levels) * stamina_mult)))
-		p["SHO"] = min(95, int(round((p["SHO"] + 3 * growth_levels) * stamina_mult)))
-		p["INT"] = min(95, int(round((p["INT"] + 2 * growth_levels) * stamina_mult)))
-		p["TAC"] = min(95, int(round((p["TAC"] + 2 * growth_levels) * stamina_mult)))
-		p["BLQ"] = min(95, int(round((p["BLQ"] + 3 * growth_levels) * stamina_mult)))
-		new_squad.append(p)
-		
-	return new_squad
+	var squad_list = []
+	var growth = gs.level - 1
+
+	for i in range(gs.starters.size()):
+		var roster_idx = gs.starters[i]
+		var raw = RosterData.ROSTER[roster_idx].duplicate()
+		var stamina = gs.get_stamina(roster_idx)
+
+		var st_mult = 1.0
+		if stamina < 50.0: st_mult = 0.80
+		elif stamina < 75.0: st_mult = 0.90
+
+		raw["PAS"] = min(95, int(round((raw["PAS"] + 2 * growth) * st_mult)))
+		raw["DRI"] = min(95, int(round((raw["DRI"] + 2 * growth) * st_mult)))
+		raw["SHO"] = min(95, int(round((raw["SHO"] + 3 * growth) * st_mult)))
+		raw["INT"] = min(95, int(round((raw["INT"] + 2 * growth) * st_mult)))
+		raw["TAC"] = min(95, int(round((raw["TAC"] + 2 * growth) * st_mult)))
+		raw["BLQ"] = min(95, int(round((raw["BLQ"] + 2 * growth) * st_mult)))
+
+		squad_list.append(raw)
+
+	return squad_list

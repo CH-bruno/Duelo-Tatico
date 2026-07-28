@@ -93,6 +93,12 @@ func match_stats() -> Dictionary:
 # 2. LINEUP
 # ==============================================================================
 
+func consume_round_stamina() -> void:
+	LineupManager.consume_round_stamina(self)
+
+func consume_action_stamina(roster_idx: int, action: String, success: bool, is_defense: bool = false) -> void:
+	LineupManager.consume_action_stamina(self, roster_idx, action, success, is_defense)
+	
 func init_stamina() -> void:
 	LineupManager.init_stamina(player_stamina)
 
@@ -101,10 +107,10 @@ func get_stamina(roster_idx: int) -> float:
 
 func set_stamina(roster_idx: int, amount: float) -> void:
 	player_stamina[roster_idx] = clampf(amount, 0.0, 100.0)
-
-func consume_starter_stamina(cost: float = 12.0) -> void:
-	LineupManager.consume_starter_stamina(self, cost)
-
+	
+func reset_all_stamina() -> void:
+	LineupManager.reset_all_stamina(player_stamina)
+	
 func apply_match_fatigue() -> void:
 	LineupManager.apply_match_fatigue(player_stamina, starters)
 
