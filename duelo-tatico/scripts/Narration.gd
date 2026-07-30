@@ -1,103 +1,136 @@
 class_name Narration
 extends RefCounted
+# Narration.gd — Banco central de narração dinâmica e reativa.
+
+# ==============================================================================
+# 1. ATAQUE (Sucessos)
+# ==============================================================================
 
 const PASS_SUCCESS = [
 	"%s (%s) encontrou %s (%s) com um passe preciso.",
 	"%s (%s) acionou %s (%s) entre as linhas.",
 	"Boa troca de passes entre %s (%s) e %s (%s).",
-	"%s (%s) inverteu a jogada para %s (%s)."
+	"%s (%s) inverteu o jogo com categoria para %s (%s)."
 ]
 
-const PASS_FAIL = [
-	"O passe de %s (%s) para %s (%s) foi interceptado.",
-	"%s (%s) errou o passe para %s (%s).",
-	"%s (%s) tentou achar %s (%s), mas a defesa cortou."
+const DRIBBLE_SUCCESS = [
+	"%s (%s) deixou o marcador para trás!",
+	"%s (%s) ganhou espaço com um belo drible!",
+	"%s (%s) tirou o corpo da jogada e passou com facilidade!"
 ]
 
-const DRIBBLE = [
-	"%s (%s) deixou o marcador para trás.",
-	"%s (%s) ganhou espaço com um belo drible.",
-	"%s (%s) passou com facilidade pelo adversário."
-]
-
-const DRIBBLE_FAIL = [
-	"%s (%s) tentou o drible, mas perdeu a bola.",
-	"%s (%s) foi desarmado.",
-	"O marcador levou a melhor sobre %s (%s).",
-	"%s (%s) exagerou no drible e perdeu a posse."
-]
-
-const FEINT = [
-	"%s (%s) aplicou uma linda finta.",
-	"%s (%s) enganou completamente a marcação.",
-	"%s (%s) fez o defensor ficar na saudade."
-]
-
-const FEINT_FAIL = [
-	"%s (%s) tentou a finta, mas o defensor não caiu.",
-	"A finta de %s (%s) não funcionou.",
-	"%s (%s) perdeu a bola na tentativa.",
-	"%s (%s) tentou um lance de efeito e foi desarmado."
+const FEINT_SUCCESS = [
+	"%s (%s) aplicou uma linda finta!",
+	"%s (%s) enganou completamente a marcação!",
+	"%s (%s) fez a zaga balançar com o jogo de corpo!"
 ]
 
 const GOAL_CALL = [
 	"GOOOOOOOOOOOL!!!!",
-	"GOOOOOOOOOL!!!",
 	"É GOOOOOOL!!!",
-	"GOOOOOOOOOOOOOOL!!!"
+	"BALANÇOU A REDE! GOOOOL!!!"
 ]
 
 const GOAL = [
 	"%s (%s) bateu colocado no canto!",
 	"%s (%s) finalizou com categoria!",
-	"%s (%s) não desperdiçou a oportunidade!",
-	"%s (%s) acertou um lindo chute!",
-	"%s (%s) venceu o goleiro!"
-]
-
-const GOAL_FAIL = [
-	"%s (%s) finalizou para fora.",
-	"O goleiro defendeu a finalização de %s (%s).",
-	"%s (%s) chutou, mas a defesa bloqueou.",
-	"%s (%s) desperdiçou uma boa oportunidade.",
-	"%s (%s) bateu firme, mas a bola passou ao lado."
+	"%s (%s) não desperdiçou a oportunidade!"
 ]
 
 const LONG_GOAL = [
 	"%s (%s) acertou um foguete de longe!",
-	"%s (%s) colocou no ângulo!",
-	"%s (%s) marcou um golaço de fora da área!",
-	"%s (%s) soltou uma bomba indefensável!"
+	"%s (%s) colocou lá no ângulo! Que golaço!",
+	"%s (%s) marcou uma pintura de fora da área!"
 ]
 
-const LONG_GOAL_FAIL = [
-	"%s (%s) arriscou de longe, mas mandou para fora.",
-	"O goleiro defendeu o chute de longa distância de %s (%s).",
-	"%s (%s) tentou surpreender de longe, mas a bola passou por cima.",
-	"A defesa bloqueou o chute de longa distância de %s (%s).",
-	"%s (%s) soltou a bomba, mas faltou direção."
+
+# ==============================================================================
+# 2. DEFESA (Usada tanto para a defesa do jogador quanto para desarmes da IA)
+# ==============================================================================
+
+const INTERCEPT_SUCCESS = [
+	"🛡 %s (%s) leu a jogada perfeitamente e fez a interceptação!",
+	"🛡 Passe cortado por %s (%s) na hora certa!",
+	"🛡 %s (%s) se antecipou e retomou a posse de bola!"
 ]
+
+const TACKLE_SUCCESS = [
+	"🛡 %s (%s) veio firme por baixo e tomou a bola de forma limpa!",
+	"🛡 Desarme perfeito de %s (%s) no tempo certo!",
+	"🛡 %s (%s) tomou a frente do lance e ficou com a bola!"
+]
+
+const BLOCK_SUCCESS = [
+	"🛡 BLOQUEIO SENSACIONAL! %s (%s) se colocou à frente do chute!",
+	"🛡 %s (%s) travou a finalização no momento exato!",
+	"🛡 Que parede! %s (%s) evitou o perigo com um grande bloqueio!"
+]
+
+const SLIDE_SUCCESS = [
+	"🦵 CARRINHO PERFEITO! %s (%s) foi de encontro à bola e limpou o lance!",
+	"🦵 NA BOLA! %s (%s) deu um carrinho espetacular e tomou a posse!",
+	"🦵 Entrada cirúrgica! %s (%s) foi de carrinho e desarmou com categoria!"
+]
+
+# Quando a defesa tenta abordar, mas o atacante passa
+const DEFENSE_BYPASSED = [
+	"❌ %s (%s) tentou a intervenção, mas foi superado no lance.",
+	"❌ O ataque levou a melhor sobre a marcação de %s (%s)!",
+	"❌ %s (%s) foi batido na jogada."
+]
+
+
+# ==============================================================================
+# 3. RECUPERAÇÃO DE POSSE (Transições)
+# ==============================================================================
 
 const ZAG_RECOVERY = [
-	"%s (%s) roubou a bola do atacante.",
-	"%s (%s) desarmou o centroavante.",
-	"%s (%s) antecipou a jogada e recuperou a posse."
+	"%s (%s) roubou a bola do atacante na zaga.",
+	"%s (%s) desarmou o centroavante com autoridade."
 ]
 
 const VOL_RECOVERY = [
-	"%s (%s) roubou a bola no meio.",
-	"%s (%s) desarmou o meia adversário.",
-	"%s (%s) interceptou o passe e recuperou a posse."
+	"%s (%s) roubou a bola na marcação do meio-campo.",
+	"%s (%s) interceptou o passe e iniciou o contra-ataque."
 ]
 
 const MEI_RECOVERY = [
-	"%s (%s) pressionou e recuperou a bola.",
-	"%s (%s) ganhou a dividida.",
-	"%s (%s) retomou a posse no ataque."
+	"%s (%s) pressionou alto e recuperou a bola.",
+	"%s (%s) retomou a posse perto da área rival."
 ]
 
 const CA_RECOVERY = [
-	"%s (%s) pressionou a saída e roubou a bola!",
-	"%s (%s) recuperou a posse ainda no ataque!",
+	"%s (%s) pressionou a saída de bola e roubou a posse!",
 	"%s (%s) forçou o erro da defesa adversária!"
+]
+
+
+# ==============================================================================
+# 4. FALTAS, CARTÕES E PÊNALTIS
+# ==============================================================================
+
+const FOUL_COMMITTED = [
+	"⚠️ Falta dura de %s (%s) em %s (%s)!",
+	"⚠️ O árbitro apita falta de %s (%s) no lance!"
+]
+
+const YELLOW_CARD = [
+	"🟨 Cartão Amarelo para %s (%s) pela falta!",
+	"🟨 O árbitro mostra o Amarelo para %s (%s)!"
+]
+
+const SECOND_YELLOW_CARD = [
+	"🟨➡️🟥 SEGUNDO AMARELO! %s (%s) comete outra falta e é EXPULSO!"
+]
+
+const RED_CARD = [
+	"🟥 CARTÃO VERMELHO DIRETO! %s (%s) comete uma falta violentíssima e está EXPULSO!"
+]
+
+const PENALTY_CALL = [
+	"🚨 PÊNALTI MARCADO! Falta cometida dentro da Grande Área!"
+]
+
+const PENALTY_GOAL = [
+	"⚽ GOL DE PÊNALTI! Cobrança perfeita no canto!"
 ]

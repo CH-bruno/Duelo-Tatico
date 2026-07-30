@@ -1,7 +1,6 @@
 class_name MatchEngine
 extends Node
-
-# ---------- Ações do Jogador ----------
+# MatchEngine.gd — Motor principal de ações, resolução de probabilidade e controle de rodadas.
 
 static func attempt(gs: Node, action: String, target_idx: int = -1) -> void:
 	if gs.match_over or gs.possession != gs.Possession.PLAYER:
@@ -30,10 +29,11 @@ static func _do_shot(gs: Node) -> void:
 	var passer = gs.active_player()
 	Stats.shot()
 	
+	gs.push_log("%s (%s) encheu o pé e finalizou para o gol!" % [passer.get("name", "Jogador"), passer.get("role", "")])
+	
 	var succ_chance = chance_for(gs, "SHO")
 	var success = randi_range(1, 100) <= succ_chance
 
-	# Consumo de stamina proporcional ao tipo de ação e resultado
 	gs.consume_action_stamina(active_roster_idx, "SHO", success)
 
 	if success:
@@ -46,7 +46,35 @@ static func _do_shot(gs: Node) -> void:
 		SFX.play_goal()
 	else:
 		gs.grant_xp(2)
-		gs.push_log(Narration.GOAL_FAIL.pick_random() % [passer["name"], passer["role"]])
+		gs.push_log("Seu chute foi bloqueado ou saiu pela linha de fundo!")
+
+	kickoff(gs, false)
+	gs.momentum_bonus = 0
+
+
+static func _do_long_shot(gs: Node) -> void:
+	var active_roster_idx = gs.starters[gs.active_idx]
+	var passer = gs.active_player()
+	Stats.long_shot_attempt()
+	
+	gs.push_log("%s (%s) soltou uma bomba de longe!" % [passer.get("name", "Jogador"), passer.get("role", "")])
+	
+	var succ_chance = long_shot_chance(gs)
+	var success = randi_range(1, 100) <= succ_chance
+
+	gs.consume_action_stamina(active_roster_idx, "LONG_SHO", success)
+
+	if success:
+		Stats.long_shot_on_target()
+		gs.goals += 1
+		gs.streak += 1
+		gs.grant_xp(20)
+		gs.push_log(Narration.GOAL_CALL.pick_random())
+		gs.push_log(Narration.LONG_GOAL.pick_random() % [passer["name"], passer["role"]])
+		SFX.play_goal()
+	else:
+		gs.grant_xp(2)
+		gs.push_log("O chute de longa distância não levou perigo!")
 
 	kickoff(gs, false)
 	gs.momentum_bonus = 0
@@ -60,22 +88,26 @@ static func _do_dribble(gs: Node) -> void:
 	var succ_chance = chance_for(gs, "DRI")
 	var success = randi_range(1, 100) <= succ_chance
 
-	# Consumo de stamina proporcional ao tipo de ação e resultado
 	gs.consume_action_stamina(active_roster_idx, "DRI", success)
 
 	if success:
 		Stats.dribble_success()
 		gs.grant_xp(6)
 		gs.streak += 1
-		gs.push_log(Narration.DRIBBLE.pick_random() % [passer["name"], passer["role"]])
+		gs.push_log(Narration.DRIBBLE_SUCCESS.pick_random() % [passer["name"], passer["role"]])
 		SFX.play_dribble()
 		gs.momentum_bonus = 22
 	else:
 		gs.grant_xp(1)
-		gs.push_log(Narration.DRIBBLE_FAIL.pick_random() % [passer["name"], passer["role"]])
 		SFX.play_turnover()
 		Referee.check_foul(gs)
-		AIOpponent.reset_possession("", gs.zone_idx)
+		
+		# 🎯 Em vez de mensagem genérica, aciona o desarme do marcador da IA!
+		var marker = Matchups.opponent_marker_for_player(gs, passer)
+		var marker_slot = Matchups.ai_slot_for_role(gs, marker.get("role", "ZAG"))
+		var fail_msg = Narration.TACKLE_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")]
+		
+		AIOpponent.reset_possession(fail_msg, marker_slot)
 		gs.momentum_bonus = 0
 
 
@@ -87,48 +119,26 @@ static func _do_feint(gs: Node) -> void:
 	var succ_chance = feint_chance(gs)
 	var success = randi_range(1, 100) <= succ_chance
 
-	# Consumo de stamina proporcional ao tipo de ação e resultado
 	gs.consume_action_stamina(active_roster_idx, "FEINT", success)
 
 	if success:
 		Stats.feint_success()
 		gs.grant_xp(9)
 		gs.streak += 1
-		gs.push_log(Narration.FEINT.pick_random() % [passer["name"], passer["role"]])
+		gs.push_log(Narration.FEINT_SUCCESS.pick_random() % [passer["name"], passer["role"]])
 		SFX.play_pass_success()
 		gs.momentum_bonus = 30
 	else:
 		gs.grant_xp(1)
 		Referee.check_foul(gs)
-		AIOpponent.reset_possession(Narration.FEINT_FAIL.pick_random() % [passer["name"], passer["role"]], gs.zone_idx)
+		
+		# 🎯 Aciona a narração de desarme do defensor rival que não caiu na finta
+		var marker = Matchups.opponent_marker_for_player(gs, passer)
+		var marker_slot = Matchups.ai_slot_for_role(gs, marker.get("role", "ZAG"))
+		var fail_msg = Narration.TACKLE_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")]
+		
+		AIOpponent.reset_possession(fail_msg, marker_slot)
 		gs.momentum_bonus = 0
-
-
-static func _do_long_shot(gs: Node) -> void:
-	var active_roster_idx = gs.starters[gs.active_idx]
-	var passer = gs.active_player()
-	Stats.long_shot_attempt()
-	
-	var succ_chance = long_shot_chance(gs)
-	var success = randi_range(1, 100) <= succ_chance
-
-	# Consumo de stamina proporcional ao tipo de ação e resultado
-	gs.consume_action_stamina(active_roster_idx, "LONG_SHO", success)
-
-	if success:
-		Stats.long_shot_on_target()
-		gs.goals += 1
-		gs.streak += 1
-		gs.grant_xp(20)
-		gs.push_log(Narration.GOAL_CALL.pick_random())
-		gs.push_log(Narration.LONG_GOAL.pick_random() % [passer["name"], passer["role"]])
-		SFX.play_goal()
-	else:
-		gs.grant_xp(2)
-		gs.push_log(Narration.LONG_GOAL_FAIL.pick_random() % [passer["name"], passer["role"]])
-
-	kickoff(gs, false)
-	gs.momentum_bonus = 0
 
 
 static func _do_pass(gs: Node, target_idx: int) -> void:
@@ -143,7 +153,6 @@ static func _do_pass(gs: Node, target_idx: int) -> void:
 	var succ_chance = pass_chance_to(gs, target_idx)
 	var success = randi_range(1, 100) <= succ_chance
 
-	# Consumo de stamina proporcional ao tipo de ação e resultado
 	gs.consume_action_stamina(active_roster_idx, "PASS", success)
 
 	if success:
@@ -157,33 +166,39 @@ static func _do_pass(gs: Node, target_idx: int) -> void:
 		gs.momentum_bonus = 8
 	else:
 		gs.grant_xp(1)
-		AIOpponent.reset_possession(Narration.PASS_FAIL.pick_random() % [passer["name"], passer["role"], target["name"], target["role"]], target_idx)
+		
+		# 🎯 Aciona a narração de interceptação do jogador rival que cortou o passe
+		var interceptor = Matchups.opponent_marker_for_player(gs, target)
+		var interceptor_slot = Matchups.ai_slot_for_role(gs, interceptor.get("role", "ZAG"))
+		var fail_msg = Narration.INTERCEPT_SUCCESS.pick_random() % [interceptor.get("name", "Adversário"), interceptor.get("role", "DEF")]
+		
+		SFX.play_turnover()
 		gs.momentum_bonus = 0
+		
+		AIOpponent.reset_possession(fail_msg, interceptor_slot)
 
 
-# ---------- Controle de Posse e Transições ----------
-
-static func player_gets_ball(gs: Node) -> void:
+static func player_gets_ball(gs: Node, target_slot: int = 0) -> void:
 	gs.possession = gs.Possession.PLAYER
 	gs.turn_state = gs.TurnState.PLAYER_ATTACK
 
-	gs.zone_idx = 0
-	gs.active_idx = 0
+	var active_slot = target_slot
+	if active_slot < gs.squad.size() and gs.squad[active_slot].get("is_ejected", false):
+		for i in range(gs.squad.size()):
+			if not gs.squad[i].get("is_ejected", false):
+				active_slot = i
+				break
 
-	gs.ai_zone_idx = 0
-	gs.ai_active_idx = 0
-	gs.ai_momentum = 0
-
-	gs.streak = 0
-	gs.momentum_bonus = 0
+	gs.zone_idx = active_slot
+	gs.active_idx = active_slot
 
 
 static func recover_possession(gs: Node, defender_idx: int) -> void:
 	gs.possession = gs.Possession.PLAYER
 	gs.turn_state = gs.TurnState.PLAYER_ATTACK
 
-	gs.active_idx = defender_idx
-	gs.zone_idx = defender_idx
+	gs.active_idx = clampi(defender_idx, 0, gs.squad.size() - 1)
+	gs.zone_idx = gs.active_idx
 
 	gs.ai_zone_idx = 0
 	gs.ai_active_idx = 0
@@ -192,15 +207,13 @@ static func recover_possession(gs: Node, defender_idx: int) -> void:
 	gs.streak = 0
 	gs.momentum_bonus = 0
 
-	var defender = gs.squad[defender_idx]
-	match defender["role"]:
+	var defender = gs.squad[gs.active_idx]
+	match defender.get("role", ""):
 		"ZAG": gs.push_log(Narration.ZAG_RECOVERY.pick_random() % [defender["name"], defender["role"]])
 		"VOL": gs.push_log(Narration.VOL_RECOVERY.pick_random() % [defender["name"], defender["role"]])
 		"MEI": gs.push_log(Narration.MEI_RECOVERY.pick_random() % [defender["name"], defender["role"]])
-		"CA":  gs.push_log(Narration.CA_RECOVERY.pick_random() % [defender["name"], defender["role"]])
+		"CA": gs.push_log(Narration.CA_RECOVERY.pick_random() % [defender["name"], defender["role"]])
 
-
-# ---------- Cálculos de Probabilidade ----------
 
 static func chance_for(gs: Node, stat_name: String) -> int:
 	var tb = 0
@@ -212,83 +225,113 @@ static func chance_for(gs: Node, stat_name: String) -> int:
 		tb = gs.trait_bonus("SHO")
 		marker_stat = "BLQ"
 
-	var marker = gs._opponent_marker_for(gs.zone_idx)
-	var difficulty = marker[marker_stat] + gs._difficulty_bonus()
-	return Rules.success_chance(gs.active_player()[stat_name], difficulty, gs.momentum_bonus, tb)
+	var marker = Matchups.opponent_marker_for_player(gs, gs.active_player())
+	var difficulty = marker.get(marker_stat, 50) + gs._difficulty_bonus()
+	return Rules.success_chance(gs.active_player().get(stat_name, 50), difficulty, gs.momentum_bonus, tb)
 
 
 static func feint_chance(gs: Node) -> int:
-	var stat_avg = (gs.active_player()["DRI"] + gs.active_player()["SHO"]) / 2.0
-	var marker = gs._opponent_marker_for(gs.zone_idx)
-	var marker_avg = (marker["TAC"] + marker["BLQ"]) / 2.0
+	var p = gs.active_player()
+	var stat_avg = (p.get("DRI", 50) + p.get("SHO", 50)) / 2.0
+	var marker = Matchups.opponent_marker_for_player(gs, p)
+	var marker_avg = (marker.get("TAC", 50) + marker.get("BLQ", 50)) / 2.0
 	var tb = gs.trait_bonus("FEINT")
 	return Rules.success_chance(stat_avg, marker_avg + 8 + gs._difficulty_bonus(), gs.momentum_bonus, tb, 5, 90)
 
 
 static func long_shot_chance(gs: Node) -> int:
-	var marker = gs._opponent_marker_for(gs.zone_idx)
+	var marker = Matchups.opponent_marker_for_player(gs, gs.active_player())
 	var tb = gs.trait_bonus("LONG_SHO")
-	return Rules.success_chance(gs.active_player()["SHO"], marker["BLQ"] + 20 + gs._difficulty_bonus(), gs.momentum_bonus, tb, 5, 85)
+	return Rules.success_chance(gs.active_player().get("SHO", 50), marker.get("BLQ", 50) + 20 + gs._difficulty_bonus(), gs.momentum_bonus, tb, 5, 85)
 
 
 static func pass_chance_to(gs: Node, target_idx: int) -> int:
+	var target = gs.squad[target_idx]
 	var distance = abs(target_idx - gs.zone_idx)
 	var adjacent_bonus = 14 if distance == 1 else 0
 	var distance_penalty = max(0, distance - 1) * 15
 	var momentum_effect = (gs.momentum_bonus * 1.5) if distance >= 2 else float(gs.momentum_bonus)
 
-	var marker = gs._opponent_marker_for(target_idx)
+	var marker = Matchups.opponent_marker_for_player(gs, target)
 	var tb = gs.trait_bonus("PASS")
-	var effective_difficulty = marker["INT"] + distance_penalty - adjacent_bonus + gs._difficulty_bonus()
-	return Rules.success_chance(gs.active_player()["PAS"], effective_difficulty, momentum_effect, tb)
+	var effective_difficulty = marker.get("INT", 50) + distance_penalty - adjacent_bonus + gs._difficulty_bonus()
+	return Rules.success_chance(gs.active_player().get("PAS", 50), effective_difficulty, momentum_effect, tb)
 
-
-# ---------- Controle de Rodada ----------
 
 static func kickoff(gs: Node, start_with_player: bool = true) -> void:
 	if start_with_player:
 		player_gets_ball(gs)
 		var p = gs.active_player()
-		gs.push_log("Reinício de jogo. A posse da bola está com %s (%s)." % [p["name"], p["role"]])
+		var msg = ""
+		
+		if gs.round_num == 0:
+			msg = "Saída de bola! 1º Tempo começa com %s (%s)." % [p.get("name", "Jogador"), p.get("role", "")]
+		else:
+			msg = "Reinício de jogo. A posse da bola está com %s (%s)." % [p.get("name", "Jogador"), p.get("role", "")]
+
+		if gs.log_messages.is_empty() or gs.log_messages[0] != msg:
+			gs.push_log(msg)
+
 	else:
-		gs.possession = gs.Possession.AI
-		gs.turn_state = gs.TurnState.PLAYER_DEFENSE
-		gs.ai_zone_idx = 0
-		gs.ai_active_idx = 0
-		gs.ai_momentum = 0
+		var opp_squad = gs.current_opponent_team().get("squad", [])
+		var zag_zone = 3
+		for i in range(opp_squad.size()):
+			if opp_squad[i].get("role", "") == "ZAG":
+				zag_zone = i
+				break
+
+		AIOpponent.gets_ball(zag_zone)
 		var p = gs.ai_active_player()
-		gs.push_log("Reinício de jogo. A posse da bola está com %s (%s)." % [p["name"], p["role"]])
+		var msg = ""
+		
+		if gs.round_num == (gs.MAX_ROUNDS / 2) or gs.round_num == 0:
+			msg = "Saída de bola do 2º Tempo! O adversário começa jogando com %s (%s)." % [p.get("name", "Adversário"), p.get("role", "")]
+		else:
+			msg = "Reinício de jogo. A posse da bola está com %s (%s)." % [p.get("name", "Adversário"), p.get("role", "")]
+
+		if gs.log_messages.is_empty() or gs.log_messages[0] != msg:
+			gs.push_log(msg)
+			
 		AIOpponent.take_turn()
 
 	gs.state_changed.emit()
 
 
 static func advance_round(gs: Node) -> void:
-	gs.round_num += 1
+	# 🛑 SE O JOGO JÁ ACABOU, NÃO AVANÇA MAIS RODADAS E NEM REPETE LOGS
+	if gs.match_over:
+		return
 
-	# Desgaste passivo por posição a cada rodada
+	gs.round_num += 1
 	gs.consume_round_stamina()
 
-	# Gatilho do Intervalo (Rodada 15)
-	if gs.round_num == gs.MAX_ROUNDS / 2 and gs.first_half:
+	# Gatilho do Intervalo na metade da partida (Rodada 15)
+	if gs.round_num == int(gs.MAX_ROUNDS / 2.0) and gs.first_half:
 		gs.first_half = false
 		MatchFlow.half_time(gs)
 		return
 
-	# Fim de Jogo (Rodada 30)
+	# Gatilho do Fim de Jogo (Rodada 30)
 	if gs.round_num >= gs.MAX_ROUNDS:
+		gs.round_num = gs.MAX_ROUNDS # Clampa em 30 (impede 31/30)
 		gs.match_over = true
 		SFX.play_whistle()
 		
 		Progression.process_pending_xp(gs)
 		
+		# Registra as mensagens no log APENAS UMA VEZ
 		if gs.goals > gs.ai_goals:
 			gs.push_log("Vitória por %d × %d!" % [gs.goals, gs.ai_goals])
-			if gs.campaign_stage >= gs.MAX_CAMPAIGN_STAGE:
-				gs.push_log("PARABÉNS! Você venceu a Grande Final e completou a Campanha!")
+			if gs.game_mode == gs.GameMode.CAMPAIGN:
+				if gs.campaign_stage >= gs.MAX_CAMPAIGN_STAGE:
+					gs.push_log("PARABÉNS! Você venceu a Grande Final!")
+				else:
+					gs.push_log("Clique em 'Próxima Partida' para continuar a campanha.")
 			else:
-				gs.push_log("Clique em 'Próxima Partida' para continuar a campanha.")
+				gs.push_log("Clique em 'Próximo Desafio' para avançar.")
 		elif gs.goals < gs.ai_goals:
 			gs.push_log("Derrota por %d × %d." % [gs.goals, gs.ai_goals])
 		else:
 			gs.push_log("Empate em %d × %d." % [gs.goals, gs.ai_goals])
+			
+		gs.state_changed.emit()

@@ -1,10 +1,10 @@
 extends Control
-# PitchView.gd — Renderizador 2D do Campo, Arquibancada, Jogadores, Bola e Inversão de Lados no 2º Tempo.
+# PitchView.gd — Renderizador 2D do Campo, Arquibancada, Jogadores e Bola.
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 
 # ===========================
-#           CORES
+#             CORES
 # ===========================
 const GRASS_LIGHT = Color("#4caf50")
 const GRASS_DARK  = Color("#3e9142")
@@ -20,17 +20,19 @@ const PLAYER_BORDER = Color("#0d325e")
 const ENEMY_COLOR = Color("#ff6464")
 const ENEMY_BORDER = Color("#5d1111")
 
+const EJECTED_COLOR = Color(0.2, 0.2, 0.2, 0.5)
+const EJECTED_BORDER = Color(0.4, 0.1, 0.1, 0.6)
+
 const BALL_COLOR = AppTheme.TEXT_COLOR
 const BALL_SHADOW = Color(0, 0, 0, 0.35)
 
 # ===========================
-#         ANIMAÇÕES
+#           ANIMAÇÕES
 # ===========================
 var visual_column := 0.0
 var pulse_alpha := 0.75
 var ball_rotation := 0.0
 
-# Flashes de Câmera na Penumbra da Arquibancada
 var flash_pos := Vector2.ZERO
 var flash_alpha := 0.0
 
@@ -51,7 +53,6 @@ func _ready():
 func _process(delta):
 	ball_rotation += delta * 4.5
 
-	# Lógica dos Flashes de Câmera esporádicos
 	if randf() < 0.04 and flash_alpha <= 0.0:
 		var side = randi() % 2
 		var y_pos = randf_range(2, 16) if side == 0 else randf_range(size.y - 18, size.y - 2)
@@ -65,16 +66,24 @@ func _process(delta):
 
 
 # ===========================
-#     CÁLCULO DE COLUNAS
+#      CÁLCULO DE COLUNAS
 # ===========================
 func _target_column() -> int:
-	var ai_has_ball = GameState.possession == GameState.Possession.AI
-	var raw_column = GameState.ai_active_column() if ai_has_ball else GameState.zone_idx
-
-	# Se for 2º tempo (first_half = false), inverte horizontalmente as colunas (0->3, 1->2, etc.)
-	if not GameState.first_half:
-		return 3 - raw_column
-	return raw_column
+	var ai_has_ball = (GameState.possession == GameState.Possession.AI)
+	
+	if ai_has_ball:
+		var active_ai_player = GameState.ai_active_player()
+		
+		for col in range(GameState.ZONES.size()):
+			var my_player = GameState.squad[clampi(col, 0, GameState.squad.size() - 1)]
+			var opp_player = Matchups.opponent_marker_for_player(GameState, my_player)
+			
+			if opp_player.get("name", "") == active_ai_player.get("name", "") and opp_player.get("role", "") == active_ai_player.get("role", ""):
+				return col
+				
+		return clampi(int(GameState.ai_active_idx), 0, 3)
+	else:
+		return clampi(int(GameState.active_idx), 0, 3)
 
 
 func _on_state_changed():
@@ -99,7 +108,7 @@ func _on_state_changed():
 	)
 
 
-func _set_visual_column(v):
+func _set_visual_column(v: float):
 	visual_column = v
 	queue_redraw()
 
@@ -123,7 +132,7 @@ func _start_pulse():
 	).set_trans(Tween.TRANS_SINE)
 
 
-func _set_pulse(v):
+func _set_pulse(v: float):
 	pulse_alpha = v
 	queue_redraw()
 
@@ -152,11 +161,23 @@ func _draw_crowd(h: float):
 # ===========================
 #            DRAW
 # ===========================
-func _draw_player(pos: Vector2, color: Color, border: Color):
-	draw_circle(pos + Vector2(2, 3), 11, Color(0, 0, 0, 0.25))
-	draw_circle(pos, 10, border)
-	draw_circle(pos, 8, color)
-	draw_circle(pos + Vector2(-2, -2), 2.2, Color.WHITE)
+func _draw_player(pos: Vector2, color: Color, border: Color, is_ejected: bool = false, has_yellow: bool = false):
+	if is_ejected:
+		# Cartão Vermelho (Jogador Indisponível/Escurecido)
+		draw_circle(pos + Vector2(2, 3), 11, Color(0, 0, 0, 0.15))
+		draw_circle(pos, 10, EJECTED_BORDER)
+		draw_circle(pos, 8, EJECTED_COLOR)
+		# Desenha Cartão Vermelho Visual ao lado da peça
+		draw_rect(Rect2(pos.x + 8, pos.y - 10, 6, 9), Color(0.9, 0.1, 0.1))
+	else:
+		draw_circle(pos + Vector2(2, 3), 11, Color(0, 0, 0, 0.25))
+		draw_circle(pos, 10, border)
+		draw_circle(pos, 8, color)
+		draw_circle(pos + Vector2(-2, -2), 2.2, Color.WHITE)
+
+		# 🟨 Desenha Cartão Amarelo Visual ao lado da peça (se estiver amarelado)
+		if has_yellow:
+			draw_rect(Rect2(pos.x + 8, pos.y - 10, 6, 9), Color(0.95, 0.8, 0.1))
 
 
 func _draw_ball(pos: Vector2):
@@ -179,7 +200,7 @@ func _draw():
 	# ===== 1. FUNDO DO ESTÁDIO =====
 	draw_rect(Rect2(Vector2.ZERO, size), Color("#151515"))
 
-	# ===== 2. ARQUIBANCADA (PENUMBRA + FLASHES) =====
+	# ===== 2. ARQUIBANCADA =====
 	var crowd_height := 20.0
 	_draw_crowd(crowd_height)
 
@@ -260,10 +281,9 @@ func _draw():
 	draw_rect(Rect2(field_margin - 8, mid_y - 36, 8, 72), Color(0.92, 0.92, 0.92))
 	draw_rect(Rect2(size.x - field_margin, mid_y - 36, 8, 72), Color(0.92, 0.92, 0.92))
 
-# ===== 8. JOGADORES =====
-	var ai_has_ball = GameState.possession == GameState.Possession.AI
+	# ===== 8. JOGADORES (ALINHAMENTO POR DUELO MATCHUP) =====
+	var ai_has_ball = (GameState.possession == GameState.Possession.AI)
 	var active_column = _target_column()
-	var is_first_half = GameState.first_half
 
 	for i in range(zone_count):
 		if i == active_column:
@@ -277,32 +297,43 @@ func _draw():
 				AI_GLOW if ai_has_ball else ACTIVE_GLOW
 			)
 
-		# Mapeamento da zona lógica do jogador
-		var logic_zone = i if is_first_half else (3 - i)
-		var attacker = GameState.team_player_at_column(logic_zone, !ai_has_ball)
-		var defender = GameState.team_player_at_column(logic_zone, ai_has_ball)
+		var my_player = GameState.squad[clampi(i, 0, GameState.squad.size() - 1)]
+		var opp_player = Matchups.opponent_marker_for_player(GameState, my_player)
+
+		# Verificação de expulsão
+		var my_is_ejected = my_player.get("is_ejected", false)
+		var opp_is_ejected = opp_player.get("is_ejected", false)
+
+		# Verificação de cartão amarelo
+		var roster_idx = GameState.starters[clampi(i, 0, GameState.starters.size() - 1)]
+		var my_has_yellow = GameState.yellow_cards.get(roster_idx, false) and not my_is_ejected
+		var opp_has_yellow = opp_player.get("has_yellow", false) and not opp_is_ejected
 
 		var px = i * zone_width + zone_width / 2.0
 
-		var top = Vector2(px, 85)
-		var bottom = Vector2(px, size.y - 85)
+		var top_pos = Vector2(px, 75)
+		var bottom_pos = Vector2(px, size.y - 75)
 
-		# CORES FIXAS: Seu time sempre mantêm PLAYER_COLOR e a IA mantêm ENEMY_COLOR
-		var top_color = PLAYER_COLOR if !ai_has_ball else ENEMY_COLOR
-		var top_border = PLAYER_BORDER if !ai_has_ball else ENEMY_BORDER
-		var bottom_color = ENEMY_COLOR if !ai_has_ball else PLAYER_COLOR
-		var bottom_border = ENEMY_BORDER if !ai_has_ball else PLAYER_BORDER
+		# Desenha IA (Topo)
+		_draw_player(top_pos, ENEMY_COLOR, ENEMY_BORDER, opp_is_ejected, opp_has_yellow)
+		# Desenha Usuário (Baixo)
+		_draw_player(bottom_pos, PLAYER_COLOR, PLAYER_BORDER, my_is_ejected, my_has_yellow)
 
-		_draw_player(top, top_color, top_border)
-		_draw_player(bottom, bottom_color, bottom_border)
+		# Textos da IA (Topo)
+		var opp_prefix = "🟥 " if opp_is_ejected else ("🟨 " if opp_has_yellow else "")
+		var opp_name = opp_prefix + opp_player.get("name", "")
+		var opp_color = Color(0.9, 0.3, 0.3) if opp_is_ejected else (Color(1.0, 0.85, 0.3) if opp_has_yellow else AppTheme.TEXT_COLOR)
+		draw_string(font, Vector2(px - 45, 48), opp_player.get("role", ""), HORIZONTAL_ALIGNMENT_CENTER, 90, font_size, opp_color)
+		draw_string(font, Vector2(px - 45, 62), opp_name, HORIZONTAL_ALIGNMENT_CENTER, 90, 11, opp_color)
 
-		draw_string(font, Vector2(px - 45, 108), attacker["role"], HORIZONTAL_ALIGNMENT_CENTER, 90, font_size, AppTheme.TEXT_COLOR)
-		draw_string(font, Vector2(px - 45, 124), attacker["name"], HORIZONTAL_ALIGNMENT_CENTER, 90, 11, AppTheme.TEXT_COLOR)
+		# Textos do Usuário (Baixo)
+		var my_prefix = "🟥 " if my_is_ejected else ("🟨 " if my_has_yellow else "")
+		var my_name = my_prefix + my_player.get("name", "")
+		var my_color = Color(0.9, 0.3, 0.3) if my_is_ejected else (Color(1.0, 0.85, 0.3) if my_has_yellow else AppTheme.TEXT_COLOR)
+		draw_string(font, Vector2(px - 45, size.y - 48), my_player.get("role", ""), HORIZONTAL_ALIGNMENT_CENTER, 90, font_size, my_color)
+		draw_string(font, Vector2(px - 45, size.y - 32), my_name, HORIZONTAL_ALIGNMENT_CENTER, 90, 11, my_color)
 
-		draw_string(font, Vector2(px - 45, size.y - 54), defender["role"], HORIZONTAL_ALIGNMENT_CENTER, 90, font_size, AppTheme.TEXT_COLOR)
-		draw_string(font, Vector2(px - 45, size.y - 38), defender["name"], HORIZONTAL_ALIGNMENT_CENTER, 90, 11, AppTheme.TEXT_COLOR)
-
-		if i == active_column:
+		if i == active_column and not my_is_ejected and not opp_is_ejected:
 			draw_string(
 				font,
 				Vector2(px - 12, mid_y + 5),
@@ -315,8 +346,6 @@ func _draw():
 
 	# ===== 9. BOLA =====
 	var ball_x = visual_column * zone_width + zone_width / 2.0
-	
-	# A bola fica no atacante (linha do topo)
-	var ball_y = 150
+	var ball_y = 75.0 if ai_has_ball else (size.y - 75.0)
 
 	_draw_ball(Vector2(ball_x, ball_y))

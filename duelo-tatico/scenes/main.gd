@@ -122,7 +122,8 @@ func _connect_signals() -> void:
 	options_button.pressed.connect(_on_options_pressed)
 	
 	if sub_button:
-		sub_button.pressed.connect(_open_substitutions_dialog)
+		# ✅ Conexão segura via lambda para evitar inconsistências de parâmetros
+		sub_button.pressed.connect(func(): _open_substitutions_dialog(false))
 
 	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
 	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
@@ -173,20 +174,27 @@ func _show_halftime_dialog(details: Dictionary) -> void:
 
 	dialog.continued.connect(func():
 		if GameState.can_substitute():
-			_open_substitutions_dialog()
+			_open_substitutions_dialog(true)
 		else:
+			MatchFlow.start_second_half(GameState)
 			refresh_ui()
 	)
 
 
-func _open_substitutions_dialog() -> void:
+func _open_substitutions_dialog(is_halftime: bool = false) -> void:
 	if has_node("SubstitutionDialog"):
 		return
 
 	var dialog = SubstitutionDialogScene.instantiate()
 	add_child(dialog)
 	dialog.setup()
-	dialog.closed.connect(refresh_ui)
+	
+	dialog.closed.connect(func():
+		# Dispara a saída de bola do 2º tempo apenas se veio do intervalo
+		if is_halftime or (GameState.round_num == int(GameState.MAX_ROUNDS / 2.0) and not GameState.first_half):
+			MatchFlow.start_second_half(GameState)
+		refresh_ui()
+	)
 
 
 func show_match_stats():

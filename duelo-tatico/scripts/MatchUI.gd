@@ -19,6 +19,7 @@ var defense_container: HBoxContainer
 var intercept_button: Button
 var tackle_button: Button
 var block_button: Button
+var slide_button: Button
 var attack_container: HBoxContainer
 
 
@@ -39,7 +40,21 @@ func setup(nodes: Dictionary) -> void:
 	block_button = nodes["block_button"]
 	attack_container = nodes["attack_container"]
 
+	_setup_slide_button()
 	_setup_ui_styles()
+
+
+func _setup_slide_button() -> void:
+	if defense_container:
+		if defense_container.has_node("SlideButton"):
+			slide_button = defense_container.get_node("SlideButton")
+		else:
+			slide_button = Button.new()
+			slide_button.name = "SlideButton"
+			defense_container.add_child(slide_button)
+			
+			slide_button.pressed.connect(func(): GameState.defend("SLIDE"))
+			UIUtils.add_press_feedback(slide_button)
 
 
 func _setup_ui_styles() -> void:
@@ -64,7 +79,7 @@ func _setup_ui_styles() -> void:
 		zone_label.add_theme_stylebox_override("normal", header_box)
 
 	if log_label:
-		log_label.custom_minimum_size = Vector2(0, 95)
+		log_label.custom_minimum_size = Vector2(0, 110)
 		log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 		var log_box = StyleBoxFlat.new()
@@ -99,62 +114,112 @@ func refresh() -> void:
 			zone_name, GameState.goals, GameState.ai_goals
 		]
 
-	# 2. CARDS DE JOGADORES (Ataque vs Defesa)
+	# 2. CARDS DE JOGADORES
 	var attacker: Dictionary
 	var defender: Dictionary
 
 	if has_player_ball:
 		attacker = GameState.active_player()
-		match attacker["role"]:
-			"ZAG": defender = GameState.current_opponent_team()["squad"][3]
-			"VOL": defender = GameState.current_opponent_team()["squad"][2]
-			"MEI": defender = GameState.current_opponent_team()["squad"][1]
-			"CA": defender = GameState.current_opponent_team()["squad"][0]
+		defender = Matchups.opponent_marker_for_player(GameState, attacker)
 	else:
 		attacker = GameState.ai_active_player()
-		defender = GameState.squad[GameState.defender_for_attacker()]
+		defender = Matchups.player_defender_for_ai(GameState, attacker)
+
+	var att_ejected = " 🟥 [EXPULSO]" if attacker.get("is_ejected", false) else ""
+	var def_ejected = " 🟥 [EXPULSO]" if defender.get("is_ejected", false) else ""
 
 	stats_label.text = (
-		"⚽ COM A BOLA: %s (%s)   │   PAS %d   DRI %d   SHO %d\n" % [
-			attacker["name"], attacker["role"], attacker["PAS"], attacker["DRI"], attacker["SHO"]
+		"⚽ COM A BOLA: %s (%s)%s  │   PAS %d   DRI %d   SHO %d\n" % [
+			attacker.get("name", "---"), attacker.get("role", "---"), att_ejected,
+			attacker.get("PAS", 0), attacker.get("DRI", 0), attacker.get("SHO", 0)
 		] +
-		"🛡 DEFENDENDO: %s (%s)   │   INT %d   TAC %d   BLQ %d" % [
-			defender["name"], defender["role"], defender["INT"], defender["TAC"], defender["BLQ"]
+		"🛡 DEFENDENDO: %s (%s)%s  │   INT %d   TAC %d   BLQ %d" % [
+			defender.get("name", "---"), defender.get("role", "---"), def_ejected,
+			defender.get("INT", 0), defender.get("TAC", 0), defender.get("BLQ", 0)
 		]
 	)
 
-	# 3. TURNO E BOTÕES
-	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE and not GameState.match_over
+	# 🛑 VERIFICAÇÃO DE FIM DE PARTIDA: Oculta todos os painéis de controle
+	if GameState.match_over:
+		attack_container.visible = false
+		pass_container.visible = false
+		defense_container.visible = false
+		
+		var can_next = (
+			GameState.game_mode == GameState.GameMode.CAMPAIGN
+			and GameState.goals > GameState.ai_goals
+			and GameState.campaign_stage < GameState.MAX_CAMPAIGN_STAGE
+		)
+		next_match.visible = can_next
+		_render_logs()
+		return
+
+	# 3. TURNO E BOTÕES DE DEFESA / ATAQUE
+	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE
+	var def_is_ejected = defender.get("is_ejected", false)
 
 	attack_container.visible = not is_defending
 	pass_container.visible = not is_defending
 	defense_container.visible = is_defending
 
+	# 🛑 SE O DEFENSOR NESSA ZONA ESTIVER EXPULSO:
+	if is_defending and def_is_ejected:
+		intercept_button.visible = false
+		tackle_button.visible = false
+		block_button.visible = false
+		if slide_button: slide_button.visible = false
+		
+		GameState.push_log("⚠️ Zona desprotegida (%s expulso)! O rival avança sem marcação." % defender.get("name", "Jogador"))
+		AIOpponent._move_succeeds()
+		_render_logs()
+		return
+
 	if is_defending:
 		var int_chance = GameState.defense_chance("INTERCEPT")
 		var tac_chance = GameState.defense_chance("TACKLE")
 		var blq_chance = GameState.defense_chance("BLOCK")
+		var slide_chance = GameState.defense_chance("SLIDE")
 
+		var def_role = defender.get("role", "")
+		var is_defensive_role = def_role in ["ZAG", "VOL"]
+
+		intercept_button.visible = true
+		tackle_button.visible = true
 		intercept_button.text = "Interceptação (%d%%)" % int_chance
 		tackle_button.text = "Desarme (%d%%)" % tac_chance
+
+		# 🛡 BLOQUEIO: Visível e ativo apenas para ZAG e VOL
+		block_button.visible = is_defensive_role
+		block_button.disabled = not is_defensive_role
 		block_button.text = "Bloqueio (%d%%)" % blq_chance
 
 		intercept_button.modulate = color_for_chance(int_chance)
 		tackle_button.modulate = color_for_chance(tac_chance)
 		block_button.modulate = color_for_chance(blq_chance)
 
+		if slide_button:
+			slide_button.visible = true
+			slide_button.text = "🦵 Carrinho ⚠ (%d%%)" % slide_chance
+			slide_button.modulate = AppTheme.DANGER
+
 	var in_box = zone == GameState.ZONES.size() - 1
 	var in_final_third = zone == 2
+	var active_role = attacker.get("role", "")
+	var is_ca = active_role == "CA"
+	var att_is_ejected = attacker.get("is_ejected", false)
 
-	sho_button.disabled = not in_box or GameState.match_over
-	dri_button.disabled = GameState.match_over
-	feint_button.disabled = GameState.match_over
-	long_shot_button.disabled = not in_final_third or GameState.match_over
+	sho_button.visible = is_ca
+	sho_button.disabled = not (in_box and is_ca) or att_is_ejected
+
 	long_shot_button.visible = in_final_third
+	long_shot_button.disabled = not in_final_third or att_is_ejected
+
+	dri_button.disabled = att_is_ejected
+	feint_button.disabled = att_is_ejected
 
 	var dri_chance = MatchEngine.chance_for(GameState, "DRI")
 	var feint_chance = MatchEngine.feint_chance(GameState)
-	var sho_chance = MatchEngine.chance_for(GameState, "SHO") if in_box else 0
+	var sho_chance = MatchEngine.chance_for(GameState, "SHO") if (in_box and is_ca) else 0
 	var long_shot_chance = MatchEngine.long_shot_chance(GameState) if in_final_third else 0
 
 	dri_button.text = "Drible (%d%%)" % dri_chance
@@ -168,17 +233,15 @@ func refresh() -> void:
 	long_shot_button.modulate = color_for_chance(long_shot_chance) if in_final_third else Color.WHITE
 
 	rebuild_pass_buttons()
-
-	var can_next_match = (
-		GameState.game_mode == GameState.GameMode.CAMPAIGN
-		and GameState.match_over
-		and GameState.goals > GameState.ai_goals
-	)
-	next_match.visible = can_next_match
+	next_match.visible = false
 
 	# 4. LOG DE NARRAÇÃO
+	_render_logs()
+
+
+func _render_logs() -> void:
 	var formatted_logs: Array[String] = []
-	var logs = GameState.log_messages.slice(0, 4)
+	var logs = GameState.log_messages.slice(0, 5)
 
 	for i in range(logs.size()):
 		if i == 0:
@@ -202,7 +265,12 @@ func rebuild_pass_buttons() -> void:
 	for i in range(GameState.squad.size()):
 		if i == GameState.active_idx:
 			continue
+		
 		var teammate = GameState.squad[i]
+		
+		if teammate.get("is_ejected", false):
+			continue
+
 		var pass_chance = MatchEngine.pass_chance_to(GameState, i)
 		var btn = Button.new()
 		btn.text = "Passar p/ %s (%d%%)" % [teammate["name"], pass_chance]
@@ -216,3 +284,24 @@ func rebuild_pass_buttons() -> void:
 func color_for_chance(chance_pct: int) -> Color:
 	var t = clampf(chance_pct / 100.0, 0.0, 1.0)
 	return AppTheme.DANGER.lerp(AppTheme.SUCCESS, t)
+
+
+func _update_player_card(card_node: Control, player_data: Dictionary, _is_active: bool) -> void:
+	var name_label = card_node.get_node_or_null("NameLabel")
+	var role_label = card_node.get_node_or_null("RoleLabel")
+	
+	var is_ejected = player_data.get("is_ejected", false)
+
+	if is_ejected:
+		card_node.modulate = Color(0.3, 0.3, 0.3, 0.6)
+		if name_label:
+			name_label.text = "🟥 %s [EXPULSO]" % player_data.get("name", "Jogador")
+			name_label.add_theme_color_override("font_color", Color(1, 0.2, 0.2))
+	else:
+		card_node.modulate = Color(1, 1, 1, 1)
+		if name_label:
+			name_label.text = player_data.get("name", "Jogador")
+			name_label.remove_theme_color_override("font_color")
+
+	if role_label:
+		role_label.text = player_data.get("role", "")

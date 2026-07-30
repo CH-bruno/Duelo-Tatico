@@ -5,7 +5,7 @@ const AppTheme = preload("res://scripts/AppTheme.gd")
 
 signal continued
 
-func setup(data: Dictionary) -> void:
+func setup(data: Dictionary = {}) -> void:
 	# 1. Torna este nó um Fundo Transparente Escuro (Modal Overlay)
 	color = Color(0, 0, 0, 0.65)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -46,9 +46,12 @@ func setup(data: Dictionary) -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# Placar
+	# ✅ PLACAR: Busca prioritariamente do GameState para evitar exibir 0x0 incorreto
+	var player_goals = data.get("goals", GameState.goals)
+	var ai_goals = data.get("ai_goals", GameState.ai_goals)
+
 	var lbl_score = Label.new()
-	lbl_score.text = "%d  ×  %d" % [data.get("goals", 0), data.get("ai_goals", 0)]
+	lbl_score.text = "%d  ×  %d" % [player_goals, ai_goals]
 	lbl_score.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl_score.add_theme_font_size_override("font_size", 32)
 	vbox.add_child(lbl_score)
@@ -56,7 +59,7 @@ func setup(data: Dictionary) -> void:
 	# Estatísticas Rápidas
 	var stats_dict = GameState.match_stats()
 	var lbl_stats = Label.new()
-	lbl_stats.text = "Chutes: %d   │   Passes Certo: %d   │   Desarmes: %d" % [
+	lbl_stats.text = "Chutes: %d    │    Passes Certo: %d    │    Desarmes: %d" % [
 		stats_dict.get("shots", 0),
 		stats_dict.get("passes_completed", 0),
 		stats_dict.get("tackles", 0)

@@ -21,7 +21,6 @@ func setup() -> void:
 
 	var panel = PanelContainer.new()
 	panel.name = "DialogPanel"
-	# Aumentamos a largura para caber com folga as informações do reserva
 	panel.custom_minimum_size = Vector2(540, 0)
 	
 	panel.anchor_left = 0.5
@@ -62,10 +61,18 @@ func _build_ui(panel: PanelContainer) -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# Linhas das 4 posições
-	for role_idx in range(RosterData.ROLES.size()):
+	# Garante que não iteraremos além das posições configuradas no starters
+	var max_roles = min(RosterData.ROLES.size(), GameState.starters.size())
+
+	# Linhas das posições válidas
+	for role_idx in range(max_roles):
 		var role = RosterData.ROLES[role_idx]
+		
+		# Validação de segurança contra índices fora do limite do array de titulares
 		var starter_roster_idx = GameState.starters[role_idx]
+		if starter_roster_idx < 0 or starter_roster_idx >= RosterData.ROSTER.size():
+			continue
+
 		var starter_p = RosterData.ROSTER[starter_roster_idx]
 		var st = int(GameState.get_stamina(starter_roster_idx))
 
@@ -96,6 +103,9 @@ func _build_ui(panel: PanelContainer) -> void:
 			bench_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			
 			for bench_idx in bench_candidates:
+				if bench_idx < 0 or bench_idx >= RosterData.ROSTER.size():
+					continue
+
 				var bench_p = RosterData.ROSTER[bench_idx]
 				var bench_st = int(GameState.get_stamina(bench_idx))
 
@@ -115,8 +125,11 @@ func _build_ui(panel: PanelContainer) -> void:
 				btn_sub.custom_minimum_size = Vector2(75, 26)
 				btn_sub.add_theme_font_size_override("font_size", 10)
 
+				var current_role_idx = role_idx
+				var current_bench_idx = bench_idx
+
 				btn_sub.pressed.connect(func():
-					if GameState.make_substitution(role_idx, bench_idx):
+					if GameState.make_substitution(current_role_idx, current_bench_idx):
 						_build_ui(panel)
 				)
 				sub_row.add_child(btn_sub)

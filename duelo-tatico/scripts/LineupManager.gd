@@ -1,31 +1,30 @@
 class_name LineupManager
 extends Node
 
-# Custos Base por Ação de Ataque (Suavizados)
-const ACTION_STAMINA = {
-	"PASS": 0.8,
-	"DRI": 1.8,
-	"FEINT": 1.5,
-	"SHO": 2.0,
-	"LONG_SHO": 2.5
-}
-
-# Custos Base por Ação de Defesa
-const DEFENSE_STAMINA = {
-	"INTERCEPT": 1.2,
-	"TACKLE": 1.8,
-	"BLOCK": 1.5
-}
-
-# Custo Passivo por Posição a cada Rodada (Rebalanceado para equilibrar MEI e CA)
 const POSITION_ROUND_COST = {
-	"ZAG": 0.8,
-	"VOL": 0.9,
-	"MEI": 0.9,
-	"CA": 0.8
+	"ZAG": 1.0,
+	"VOL": 1.1,
+	"MEI": 1.1,
+	"CA": 1.0
 }
 
-# Initialize Stamina
+# Custos de Ação Rebalanceados
+const ACTION_STAMINA = {
+	"PASS": 1.0,
+	"DRI": 1.5,
+	"FEINT": 2.0,
+	"SHO": 2.4,
+	"LONG_SHO": 2.6
+}
+
+const DEFENSE_STAMINA = {
+	"INTERCEPT": 1.5,
+	"TACKLE": 2.2,
+	"BLOCK": 1.8,
+	"SLIDE": 2.0
+}
+
+# Inicializa Stamina
 static func init_stamina(stamina_dict: Dictionary) -> void:
 	for i in range(RosterData.ROSTER.size()):
 		if not stamina_dict.has(i):
@@ -42,14 +41,18 @@ static func reset_all_stamina(stamina_dict: Dictionary) -> void:
 static func consume_round_stamina(gs: Node) -> void:
 	for i in range(gs.starters.size()):
 		var roster_idx = gs.starters[i]
-		var role = RosterData.ROLES[i]
-		var base_cost = POSITION_ROUND_COST.get(role, 0.8)
 		
-		# Variação sutil (0.95 a 1.05)
+		# Ignora expulsos
+		if roster_idx in gs.players_out:
+			continue
+
+		var role = RosterData.ROLES[i]
+		var base_cost = POSITION_ROUND_COST.get(role, 1.0)
+		
 		var actual_cost = base_cost * randf_range(0.95, 1.05)
 		var current = gs.get_stamina(roster_idx)
 		gs.set_stamina(roster_idx, current - actual_cost)
-
+		
 
 # Consumo Ativo por Ação
 static func consume_action_stamina(gs: Node, roster_idx: int, action: String, success: bool, is_defense: bool = false) -> void:
@@ -58,9 +61,9 @@ static func consume_action_stamina(gs: Node, roster_idx: int, action: String, su
 	if is_defense:
 		base_cost = DEFENSE_STAMINA.get(action, 1.5)
 	else:
-		base_cost = ACTION_STAMINA.get(action, 1.5)
+		base_cost = ACTION_STAMINA.get(action, 1.0)
 
-	# Se falhou, gasta menos energia
+	# Se falhou, gasta menos energia (50%)
 	var success_multiplier = 1.0 if success else 0.5
 	var final_cost = base_cost * success_multiplier
 
@@ -91,6 +94,12 @@ static func make_substitution(gs: Node, role_idx: int, new_roster_idx: int) -> b
 		gs.push_log("Não há substituições restantes nesta partida!")
 		return false
 
+	# 🛑 Não permite substituir jogador expulso
+	var squad_player = gs.squad[clampi(role_idx, 0, gs.squad.size() - 1)]
+	if squad_player.get("is_ejected", false):
+		gs.push_log("Jogadores expulsos não podem ser substituídos!")
+		return false
+
 	if new_roster_idx in gs.players_out:
 		gs.push_log("Este jogador já foi substituído e não pode voltar!")
 		return false
@@ -119,24 +128,49 @@ static func make_substitution(gs: Node, role_idx: int, new_roster_idx: int) -> b
 	return true
 
 
-# Retorna lista de reservas disponíveis para determinada posição (exclui titulares e quem já saiu)
-static func available_bench_for(gs: Node, role_idx: int) -> Array:
-	var role = RosterData.ROLES[role_idx]
-	var candidates = []
+# Retorna lista de reservas disponíveis para determinada posição (exclui titulares, quem já saiu e expulsos)
+static func available_bench_for(gs: Node, role_idx: int) -> Array[int]:
+	var current_starter_idx = gs.starters[role_idx]
+	var squad_player = gs.squad[clampi(role_idx, 0, gs.squad.size() - 1)]
+
+	# 🛑 REGRA DE EXPULSÃO: Se o jogador da posição estiver expulso, bloqueia substituições
+	if squad_player.get("is_ejected", false) or current_starter_idx in gs.players_out:
+		return []
+
+	var all_candidates = RosterData.candidates_for(role_idx)
+	var available: Array[int] = []
+
+	for cand_idx in all_candidates:
+		# 1. Ignora o titular que já está jogando nessa posição
+		if cand_idx == current_starter_idx:
+			continue
+			
+		# 2. Ignora jogadores que já saíram do jogo (substituídos ou expulsos)
+		if cand_idx in gs.players_out:
+			continue
+
+		# 3. Ignora jogadores que porventura estejam escalados em outras posições
+		if cand_idx in gs.starters:
+			continue
+
+		available.append(cand_idx)
+
+	return available
+
+
+static func apply_match_fatigue(stamina_dict: Dictionary, starters: Array) -> void:
 	for i in range(RosterData.ROSTER.size()):
-		var p = RosterData.ROSTER[i]
-		if p["role"] == role:
-			if not (i in gs.starters) and not (i in gs.players_out):
-				candidates.append(i)
-	return candidates
-
-
-static func apply_match_fatigue(_stamina_dict: Dictionary, _starters: Array) -> void:
-	pass
+		if i in starters:
+			# Titulares mantêm a stamina atual com a qual terminaram o jogo
+			continue
+		else:
+			# ⚡ Quem NÃO JOGOU (Banco/Reserva) recupera 100% no vestiário pós-jogo
+			stamina_dict[i] = 100.0
 
 
 static func apply_lineup(gs: Node) -> Array:
-	var squad_list = []
+	var active_squad: Array = []
+	var ejected_squad: Array = []
 	var growth = gs.level - 1
 
 	for i in range(gs.starters.size()):
@@ -155,6 +189,18 @@ static func apply_lineup(gs: Node) -> Array:
 		raw["TAC"] = min(95, int(round((raw["TAC"] + 2 * growth) * st_mult)))
 		raw["BLQ"] = min(95, int(round((raw["BLQ"] + 2 * growth) * st_mult)))
 
-		squad_list.append(raw)
+		if roster_idx in gs.players_out:
+			raw["is_ejected"] = true
+			ejected_squad.append(raw)
+		else:
+			raw["is_ejected"] = false
+			active_squad.append(raw)
 
-	return squad_list
+	# REORGANIZAÇÃO:
+	# Quem sobrou cobre da Zaga até o Meio/Ataque.
+	# O expulso fica isolado no último slot.
+	var final_squad: Array = []
+	final_squad.append_array(active_squad)
+	final_squad.append_array(ejected_squad)
+
+	return final_squad

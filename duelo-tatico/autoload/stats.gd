@@ -19,6 +19,9 @@ var long_shots_on_target: int = 0
 var interceptions: int = 0
 var tackles: int = 0
 var blocks: int = 0
+var slides: int = 0
+var turnovers_count: int = 0
+var fouls_committed: int = 0
 
 var xp_gained_match: int = 0
 
@@ -55,8 +58,11 @@ func long_shot_attempt() -> void:
 func long_shot_on_target() -> void:
 	long_shots_on_target += 1
 
+func add_goal(_player_idx: int = -1) -> void:
+	pass # Suporte para rastreamento de gols se necessário
 
-# ---------- Mutadores / Ações Defesa ----------
+
+# ---------- Mutadores / Ações Defesa & Disciplina ----------
 
 func interception() -> void:
 	interceptions += 1
@@ -66,6 +72,15 @@ func tackle() -> void:
 
 func block() -> void:
 	blocks += 1
+
+func slide() -> void:
+	slides += 1
+
+func add_turnover() -> void:
+	turnovers_count += 1
+
+func add_foul() -> void:
+	fouls_committed += 1
 
 
 # ---------- Reset e Exportação ----------
@@ -84,6 +99,9 @@ func reset() -> void:
 	interceptions = 0
 	tackles = 0
 	blocks = 0
+	slides = 0
+	turnovers_count = 0
+	fouls_committed = 0
 	xp_gained_match = 0
 
 
@@ -102,6 +120,8 @@ func to_dict() -> Dictionary:
 		"interceptions": interceptions,
 		"tackles": tackles,
 		"blocks": blocks,
+		"slides": slides,
+		"fouls": fouls_committed,
 		"xp": xp_gained_match,
 		"goals": GameState.goals,
 		"goals_ai": GameState.ai_goals,
