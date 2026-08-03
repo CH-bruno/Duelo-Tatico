@@ -8,7 +8,6 @@ static func half_time(gs: Node) -> void:
 	# Processa a recuperação de stamina do intervalo no vestiário
 	LineupManager.process_halftime_recovery(gs)
 
-	# Passa o placar e estatísticas corretas no evento de UI
 	var details = {
 		"goals": gs.goals,
 		"ai_goals": gs.ai_goals
@@ -24,6 +23,10 @@ static func start_second_half(gs: Node) -> void:
 
 
 static func _reset_common_stats(gs: Node) -> void:
+	# 1. Aplica a fadiga pós-partida com a lista atual de quem jogou
+	gs.apply_match_fatigue()
+
+	# 2. Reseta o estado da partida
 	gs.goals = 0
 	gs.ai_goals = 0
 	gs.turnovers = 0
@@ -36,14 +39,18 @@ static func _reset_common_stats(gs: Node) -> void:
 	gs.possession = gs.Possession.PLAYER
 	gs.turn_state = gs.TurnState.PLAYER_ATTACK
 	
-	# Limpa os logs da partida anterior
 	gs.log_messages.clear()
 	
+	# 3. Zera os cartões e expulsões do jogo anterior
 	gs.reset_substitutions()
+
+# 🏁 Chamado quando a partida REALMENTE começa (depois que o jogador já
+# confirmou/ajustou a escalação). Só agora fixamos "quem está jogando" e
+# damos o pontapé inicial — assim trocas feitas na tela de Escalação entram
+# corretas na lista usada por apply_match_fatigue no fim da partida.
+static func _start_match(gs: Node) -> void:
 	gs.reset_match_stats()
-	
-	# ✅ Aplica a regra de fadiga pós-jogo: titulares mantêm o desgaste e reservas recuperam 100%
-	gs.apply_match_fatigue()
+	MatchEngine.kickoff(gs, true)
 
 
 static func next_match(gs: Node) -> void:
@@ -51,8 +58,14 @@ static func next_match(gs: Node) -> void:
 	
 	if gs.campaign_stage < gs.MAX_CAMPAIGN_STAGE:
 		gs.campaign_stage += 1
-		
-	MatchEngine.kickoff(gs, true)
+	
+	# ⚠️ NÃO chama _start_match aqui: o jogador ainda vai passar pela
+	# Campaign Menu / tela de Escalação. O pontapé inicial só acontece em
+	# start_campaign_match(), chamado quando ele confirma e aperta "Iniciar".
+
+
+static func start_campaign_match(gs: Node) -> void:
+	_start_match(gs)
 
 
 static func next_challenge_round(gs: Node) -> void:
@@ -61,16 +74,18 @@ static func next_challenge_round(gs: Node) -> void:
 	gs.challenge_wins += 1
 	if gs.challenge_wins > gs.challenge_best:
 		gs.challenge_best = gs.challenge_wins
-		
-	MatchEngine.kickoff(gs, true)
+	
+	# Modo Desafio não passa por tela de escalação entre rodadas, então o
+	# pontapé pode acontecer imediatamente.
+	_start_match(gs)
 
 
 static func reset_game(gs: Node) -> void:
+	# ⚡ REINÍCIO TOTAL: Restaura a energia de 100% de todo o elenco
+	gs.reset_all_stamina()
+	
 	_reset_common_stats(gs)
 	gs.campaign_stage = 1
 	gs.challenge_wins = 0
 	
-	# Reinício total de um novo jogo: restaura stamina de todo o elenco
-	gs.reset_all_stamina()
-	
-	MatchEngine.kickoff(gs, true)
+	_start_match(gs)

@@ -40,7 +40,12 @@ static func trait_name(trait_id: String) -> String:
 		_: return trait_id
 
 static func trait_bonus(player: Dictionary, action: String) -> int:
-	match player["trait"]:
+	# 🎯 Proteção adicionada: se player for nulo ou não tiver 'trait', retorna 0 em vez de crashar
+	var p_trait: String = player.get("trait", "")
+	if p_trait == "":
+		return 0
+
+	match p_trait:
 		"ARMADOR":
 			if action == "PASS": return 8
 		"ATIRADOR":

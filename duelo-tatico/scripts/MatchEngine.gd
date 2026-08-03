@@ -46,7 +46,8 @@ static func _do_shot(gs: Node) -> void:
 		SFX.play_goal()
 	else:
 		gs.grant_xp(2)
-		gs.push_log("Seu chute foi bloqueado ou saiu pela linha de fundo!")
+		var marker = Matchups.opponent_marker_for_player(gs, passer)
+		gs.push_log(Narration.BLOCK_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
 
 	kickoff(gs, false)
 	gs.momentum_bonus = 0
@@ -74,7 +75,8 @@ static func _do_long_shot(gs: Node) -> void:
 		SFX.play_goal()
 	else:
 		gs.grant_xp(2)
-		gs.push_log("O chute de longa distância não levou perigo!")
+		var marker = Matchups.opponent_marker_for_player(gs, passer)
+		gs.push_log(Narration.BLOCK_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
 
 	kickoff(gs, false)
 	gs.momentum_bonus = 0
@@ -91,6 +93,7 @@ static func _do_dribble(gs: Node) -> void:
 	gs.consume_action_stamina(active_roster_idx, "DRI", success)
 
 	if success:
+		# ✅ DRIBLE BEM SUCEDIDO: O seu atacante supera a marcação!
 		Stats.dribble_success()
 		gs.grant_xp(6)
 		gs.streak += 1
@@ -98,19 +101,19 @@ static func _do_dribble(gs: Node) -> void:
 		SFX.play_dribble()
 		gs.momentum_bonus = 22
 	else:
+		# ❌ TENTATIVA DE DRIBLE FALHOU:
+		# O Fominha tentou o drible e foi desarmado limpo pelo zagueiro da IA
 		gs.grant_xp(1)
 		SFX.play_turnover()
-		Referee.check_foul(gs)
 		
-		# 🎯 Em vez de mensagem genérica, aciona o desarme do marcador da IA!
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		var marker_slot = Matchups.ai_slot_for_role(gs, marker.get("role", "ZAG"))
 		var fail_msg = Narration.TACKLE_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")]
 		
+		# Transfere a posse de bola para a IA no local do desarme (SEM PÊNALTI E SEM FALTA)
 		AIOpponent.reset_possession(fail_msg, marker_slot)
 		gs.momentum_bonus = 0
-
-
+		
 static func _do_feint(gs: Node) -> void:
 	var active_roster_idx = gs.starters[gs.active_idx]
 	var passer = gs.active_player()
@@ -130,9 +133,8 @@ static func _do_feint(gs: Node) -> void:
 		gs.momentum_bonus = 30
 	else:
 		gs.grant_xp(1)
-		Referee.check_foul(gs)
 		
-		# 🎯 Aciona a narração de desarme do defensor rival que não caiu na finta
+		# 🎯 Defensor adversário não cai na finta e desabilita a jogada
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		var marker_slot = Matchups.ai_slot_for_role(gs, marker.get("role", "ZAG"))
 		var fail_msg = Narration.TACKLE_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")]
@@ -167,7 +169,7 @@ static func _do_pass(gs: Node, target_idx: int) -> void:
 	else:
 		gs.grant_xp(1)
 		
-		# 🎯 Aciona a narração de interceptação do jogador rival que cortou o passe
+		# 🎯 Interceptação do marcador adversário
 		var interceptor = Matchups.opponent_marker_for_player(gs, target)
 		var interceptor_slot = Matchups.ai_slot_for_role(gs, interceptor.get("role", "ZAG"))
 		var fail_msg = Narration.INTERCEPT_SUCCESS.pick_random() % [interceptor.get("name", "Adversário"), interceptor.get("role", "DEF")]
@@ -298,31 +300,27 @@ static func kickoff(gs: Node, start_with_player: bool = true) -> void:
 
 
 static func advance_round(gs: Node) -> void:
-	# 🛑 SE O JOGO JÁ ACABOU, NÃO AVANÇA MAIS RODADAS E NEM REPETE LOGS
 	if gs.match_over:
 		return
 
 	gs.round_num += 1
 	gs.consume_round_stamina()
 
-	# Gatilho do Intervalo na metade da partida (Rodada 15)
 	if gs.round_num == int(gs.MAX_ROUNDS / 2.0) and gs.first_half:
 		gs.first_half = false
 		MatchFlow.half_time(gs)
 		return
 
-	# Gatilho do Fim de Jogo (Rodada 30)
 	if gs.round_num >= gs.MAX_ROUNDS:
-		gs.round_num = gs.MAX_ROUNDS # Clampa em 30 (impede 31/30)
+		gs.round_num = gs.MAX_ROUNDS
 		gs.match_over = true
 		SFX.play_whistle()
 		
 		Progression.process_pending_xp(gs)
 		
-		# Registra as mensagens no log APENAS UMA VEZ
 		if gs.goals > gs.ai_goals:
 			gs.push_log("Vitória por %d × %d!" % [gs.goals, gs.ai_goals])
-			if gs.game_mode == gs.GameMode.CAMPAIGN:
+			if gs.game_mode == GameState.GameMode.CAMPAIGN:
 				if gs.campaign_stage >= gs.MAX_CAMPAIGN_STAGE:
 					gs.push_log("PARABÉNS! Você venceu a Grande Final!")
 				else:

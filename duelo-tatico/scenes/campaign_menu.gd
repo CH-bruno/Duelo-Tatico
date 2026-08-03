@@ -145,6 +145,7 @@ func _on_lineup_pressed():
 
 
 func _on_start_pressed():
+	GameState.start_campaign_match()
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 

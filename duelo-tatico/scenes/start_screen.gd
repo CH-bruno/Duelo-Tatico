@@ -117,3 +117,6 @@ func _challenge():
 	GameState.game_mode = GameState.GameMode.CHALLENGE
 	GameState.reset_game()
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	GameState.game_mode = GameState.GameMode.CHALLENGE
+	GameState.reset_game()
+	get_tree().change_scene_to_file("res://scenes/main.tscn")

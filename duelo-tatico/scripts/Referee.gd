@@ -1,92 +1,100 @@
 class_name Referee
 extends Node
-# Referee.gd — Árbitro da Partida (Controle de Faltas, Cartões e Pênaltis)
+# Referee.gd — Árbitro da Partida (Validação por Posicionamento Tático)
 
-# Avalia se a jogada defensiva resultou em falta e se é Pênalti
-static func check_foul(gs: Node, action: String = "TACKLE", diff: int = 0) -> Dictionary:
-	var base_foul_chance = 8.0 if action == "TACKLE" else 30.0
-	
-	if diff > 20:
-		base_foul_chance += 12.0
-	elif diff > 10:
-		base_foul_chance += 6.0
+enum Decision {
+	NONE,
+	FOUL,
+	PENALTY
+}
 
+const FOUL_CHANCES = {
+	"SLIDE_MISS_FOUL": 100,   # Carrinho errado na defesa = 100% falta
+	"TACKLE_MISS_FOUL": 20,
+	"BLOCK_MISS_FOUL": 10,
+	"INTERCEPT_MISS_FOUL": 5,
+	"DRIBBLE_FOUL": 15
+}
+
+# 🎯 AVALIAÇÃO DE FALTA E PÊNALTI BASEADA NO ROLE
+static func evaluate_foul(gs: Node, foul_context: String, is_player_foul: bool = true) -> Decision:
+	var base_chance = float(FOUL_CHANCES.get(foul_context, 10))
 	var active_def = gs.active_defender()
 	var def_trait = active_def.get("trait", "")
 	
-	if def_trait == "LIBERO" or def_trait == "CLEAN_PLAY":
-		base_foul_chance *= 0.5
-	elif def_trait == "AGGRESSIVE":
-		base_foul_chance += 10.0
+	if foul_context != "SLIDE_MISS_FOUL":
+		if def_trait == "LIBERO" or def_trait == "CLEAN_PLAY":
+			base_chance *= 0.5
+		elif def_trait == "AGGRESSIVE":
+			base_chance += 10.0
 
-	var is_foul = randf() * 100.0 < base_foul_chance
-	if not is_foul:
-		return {
-			"is_foul": false,
-			"severity": 0,
-			"is_penalty": false,
-			"is_yellow": false,
-			"is_red": false
-		}
+	var roll = randi_range(1, 100)
 
-	# ✅ REGRA RIGOROSA DO PÊNALTI:
-	# Apenas se quem está com a bola for o CA e estiver dentro da Grande Área correspondente!
-	var is_penalty = false
-	if gs.possession == gs.Possession.AI:
-		var ai_player = gs.ai_active_player()
-		# IA está atacando na sua Grande Área (Coluna 0) com o CA (Pipoca)
-		if ai_player.get("role", "") == "CA" and gs.ai_zone_idx == 0:
-			is_penalty = true
-	else:
-		var player_act = gs.active_player()
-		# Usuário está atacando na Grande Área rival (Coluna 3) com o CA (Fominha)
-		if player_act.get("role", "") == "CA" and gs.zone_idx == 3:
-			is_penalty = true
+	if roll <= int(base_chance):
+		var is_penalty = false
 
-	var severity = randi_range(10, 45) if action == "TACKLE" else randi_range(35, 80)
+		if is_player_foul:
+			# 🚨 JOGADOR FEZ FALTA NA DEFESA:
+			# Se quem está com a bola na IA é o CA (Centroavante), o lance é na SUA Grande Área -> PÊNALTI CONTRA VOCÊ!
+			var ai_attacker = gs.ai_active_player()
+			is_penalty = (ai_attacker.get("role", "") == "CA")
+		else:
+			# 🚨 IA FEZ FALTA NO ATAQUE:
+			# Se quem está com a bola no seu time é o seu CA (Centroavante), o lance é na área da IA -> PÊNALTI A SEU FAVOR!
+			var player_attacker = gs.active_player()
+			is_penalty = (player_attacker.get("role", "") == "CA")
 
-	if is_penalty:
-		severity += 25
-	if diff > 15:
-		severity += 10
-	if def_trait == "AGGRESSIVE":
-		severity += 15
+		if is_penalty:
+			return Decision.PENALTY
+		else:
+			return Decision.FOUL
 
-	return {
-		"is_foul": true,
-		"severity": severity,
-		"is_penalty": is_penalty,
-		"is_yellow": severity >= 40 and severity < 80,
-		"is_red": severity >= 80
-	}
+	return Decision.NONE
 
 
 # No Referee.gd:
 
-static func process_sanctions(gs: Node, foul_info: Dictionary, roster_idx: int, def_player: Dictionary = {}) -> String:
-	var player_name = def_player.get("name", "Jogador")
+static func process_cards(gs: Node, roster_idx: int, player_dict: Dictionary, is_slide: bool = false, is_player_foul: bool = true) -> String:
+	var card_roll = randi_range(1, 100)
+	var yellow_threshold = 75 if is_slide else 25
 	
-	if foul_info.get("is_red", false):
-		gs.push_log("🟥 CARTÃO VERMELHO DIRETO para %s! Entrada violenta!" % player_name)
-		SFX.play_whistle()
-		_eject_player(gs, roster_idx)
-		return "RED"
-	elif foul_info.get("is_yellow", false):
-		var count = gs.yellow_cards.get(roster_idx, 0) + 1
-		gs.yellow_cards[roster_idx] = count
-		if count >= 2:
-			gs.push_log("🟨🟥 SEGUNDO AMARELO! %s foi expulso do jogo!" % player_name)
+	var p_name = player_dict.get("name", "Jogador")
+	var p_role = player_dict.get("role", "DEF")
+
+	var target_yellows = gs.yellow_cards if is_player_foul else gs.ai_yellow_cards
+
+	if card_roll <= yellow_threshold:
+		if target_yellows.get(roster_idx, false):
+			# 🟨➡️🟥 SEGUNDO AMARELO
+			_eject_player(gs, roster_idx, player_dict, is_player_foul)
+			gs.push_log(Narration.SECOND_YELLOW_CARD.pick_random() % [p_name, p_role])
 			SFX.play_whistle()
-			_eject_player(gs, roster_idx)
 			return "RED"
 		else:
-			gs.push_log("🟨 Cartão Amarelo para %s!" % player_name)
+			# 🟨 PRIMEIRO AMARELO
+			target_yellows[roster_idx] = true
+			player_dict["has_yellow"] = true
+			gs.push_log(Narration.YELLOW_CARD.pick_random() % [p_name, p_role])
+			SFX.play_whistle()
 			return "YELLOW"
+			
+	elif is_slide and card_roll > 85:
+		# 🟥 VERMELHO DIRETO
+		_eject_player(gs, roster_idx, player_dict, is_player_foul)
+		gs.push_log(Narration.RED_CARD.pick_random() % [p_name, p_role])
+		SFX.play_whistle()
+		return "RED"
+
 	return "NONE"
 
-static func _eject_player(gs: Node, roster_idx: int) -> void:
-	if not (roster_idx in gs.players_out):
-		gs.players_out.append(roster_idx)
-	
-	# Aplica a reorganização do lineup empurrando o expulso para a última zona
-	gs._apply_lineup()
+
+static func _eject_player(gs: Node, roster_idx: int, player_dict: Dictionary, is_player_foul: bool = true) -> void:
+	if is_player_foul:
+		if not (roster_idx in gs.players_out):
+			gs.players_out.append(roster_idx)
+		player_dict["is_ejected"] = true
+		gs._apply_lineup()
+	else:
+		if not (roster_idx in gs.ai_players_out):
+			gs.ai_players_out.append(roster_idx)
+		player_dict["is_ejected"] = true
