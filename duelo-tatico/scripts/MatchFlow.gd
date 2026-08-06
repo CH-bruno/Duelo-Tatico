@@ -50,6 +50,7 @@ static func _reset_common_stats(gs: Node) -> void:
 # corretas na lista usada por apply_match_fatigue no fim da partida.
 static func _start_match(gs: Node) -> void:
 	gs.reset_match_stats()
+	gs._apply_opponent_lineup()
 	MatchEngine.kickoff(gs, true)
 
 

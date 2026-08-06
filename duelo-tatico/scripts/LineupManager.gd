@@ -73,6 +73,10 @@ static func consume_action_stamina(gs: Node, roster_idx: int, action: String, su
 # Recuperação do Intervalo Fortalecida
 static func process_halftime_recovery(gs: Node) -> void:
 	for roster_idx in gs.starters:
+		# Ignora expulsos: quem já saiu de campo não "recupera" fôlego no intervalo
+		if roster_idx in gs.players_out:
+			continue
+
 		var current = gs.get_stamina(roster_idx)
 		
 		var recovery = 0.0
@@ -156,7 +160,7 @@ static func apply_match_fatigue(stamina_dict: Dictionary, players_who_played: Ar
 			# 💤 FICOU NO BANCO O JOGO TODO: Volta direto para 100%!
 			stamina_dict[i] = 100.0
 
-# Constrói e aplica a escalação no squad MANTENDO A ORDEM RÍGIDA DOS SLOTS
+# Constrói e aplica a escalação com CURVA SUAVE DE STAMINA
 static func apply_lineup(gs: Node) -> Array:
 	var final_squad: Array = []
 	var growth = gs.level - 1
@@ -176,8 +180,11 @@ static func apply_lineup(gs: Node) -> Array:
 		raw["TAC"] = min(95, int(round((raw["TAC"] + 2 * growth) * st_mult)))
 		raw["BLQ"] = min(95, int(round((raw["BLQ"] + 3 * growth) * st_mult)))
 
-		# 🚨 MANTÉM O JOGADOR NO SEU SLOT FIXO (0, 1, 2, 3)
-		raw["is_ejected"] = roster_idx in gs.players_out
+		# Preserva a ordem rígida dos slots originais
+		if roster_idx in gs.players_out:
+			raw["is_ejected"] = true
+		else:
+			raw["is_ejected"] = false
 
 		final_squad.append(raw)
 

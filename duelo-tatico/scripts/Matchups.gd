@@ -15,7 +15,7 @@ static func defender_role_for(attacker_role: String) -> String:
 
 static func opponent_marker_for_player(gs: Node, player_dict: Dictionary) -> Dictionary:
 	var target_role = defender_role_for(player_dict.get("role", "ZAG"))
-	return _find_player_by_role(gs.current_opponent_team().get("squad", []), target_role)
+	return _find_player_by_role(gs.opponent_squad, target_role)
 
 
 static func player_defender_for_ai(gs: Node, ai_dict: Dictionary) -> Dictionary:
@@ -36,7 +36,7 @@ static func player_slot_for_role(gs: Node, role: String) -> int:
 
 
 static func ai_slot_for_role(gs: Node, role: String) -> int:
-	var opp_squad = gs.current_opponent_team().get("squad", [])
+	var opp_squad = gs.opponent_squad
 	for i in range(opp_squad.size()):
 		if opp_squad[i].get("role", "") == role:
 			return i

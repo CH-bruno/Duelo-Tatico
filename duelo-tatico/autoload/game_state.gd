@@ -54,6 +54,10 @@ var ai_active_idx: int = 0
 var ai_momentum: int = 0
 var ai_yellow_cards: Dictionary = {}
 var ai_players_out: Array = []
+# 🔒 Squad ativo do adversário para a partida atual — construído 1x por
+# partida a partir de OpponentTeams (que nunca é mutado diretamente) e
+# atualizado sempre que um cartão/expulsão da IA acontece.
+var opponent_squad: Array = []
 
 # ---------- 5. XP ----------
 var level: int = 1
@@ -68,6 +72,7 @@ var log_messages: Array = []
 func _ready() -> void:
 	init_stamina()
 	_apply_lineup()
+	_apply_opponent_lineup()
 
 
 # ==============================================================================
@@ -159,6 +164,12 @@ func set_lineup(new_starters: Array) -> void:
 func _apply_lineup() -> void:
 	squad = LineupManager.apply_lineup(self)
 
+# 🔄 Reconstrói o squad do adversário a partir dos dados originais em
+# OpponentTeams + as flags de cartão/expulsão vindas de ai_players_out /
+# ai_yellow_cards (fonte de verdade). Nunca escreve de volta em OpponentTeams.
+func _apply_opponent_lineup() -> void:
+	opponent_squad = OpponentTeams.build_active_squad(self)
+
 func active_player() -> Dictionary:
 	var safe_idx = clampi(active_idx, 0, max(0, squad.size() - 1))
 	return squad[safe_idx] if not squad.is_empty() else {}
@@ -217,10 +228,12 @@ func current_opponent_team() -> Dictionary:
 func opponent_team_name() -> String:
 	return current_opponent_team().get("name", "Adversário")
 
+# ⚠️ Usa sempre o cache (opponent_squad), nunca current_opponent_team()
+# direto — é o único jeito de manter cartões/expulsões da IA visíveis de
+# forma consistente durante a partida, sem vazar pros dados originais.
 func ai_active_player() -> Dictionary:
-	var opp_squad = current_opponent_team().get("squad", [])
-	var safe_idx = clampi(ai_active_idx, 0, max(0, opp_squad.size() - 1))
-	return opp_squad[safe_idx]
+	var safe_idx = clampi(ai_active_idx, 0, max(0, opponent_squad.size() - 1))
+	return opponent_squad[safe_idx] if not opponent_squad.is_empty() else {}
 
 func _opponent_marker_for(_zone_unused: int) -> Dictionary:
 	return Matchups.opponent_marker_for_player(self, active_player())

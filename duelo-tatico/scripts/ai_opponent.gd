@@ -38,7 +38,7 @@ static func gets_ball(start_zone: int = 3, is_recovery: bool = false) -> void:
 	GameState.possession = GameState.Possession.AI
 	GameState.turn_state = GameState.TurnState.PLAYER_DEFENSE
 
-	var opp_squad = GameState.current_opponent_team().get("squad", [])
+	var opp_squad = GameState.opponent_squad
 	var target_zone = clampi(start_zone, 0, max(0, opp_squad.size() - 1))
 
 	# VALIDAÇÃO DE JOGADOR EXPULSO:
@@ -301,7 +301,7 @@ static func _move_succeeds() -> void:
 	match GameState.ai_next_move:
 		GameState.AIMove.PASS:
 			var passer = GameState.ai_active_player()
-			var opp_squad = GameState.current_opponent_team().get("squad", [])
+			var opp_squad = GameState.opponent_squad
 			var current_idx = GameState.ai_active_idx
 
 			var valid_targets: Array[int] = []

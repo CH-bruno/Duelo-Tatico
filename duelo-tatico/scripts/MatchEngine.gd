@@ -101,18 +101,42 @@ static func _do_dribble(gs: Node) -> void:
 		SFX.play_dribble()
 		gs.momentum_bonus = 22
 	else:
-		# ❌ TENTATIVA DE DRIBLE FALHOU:
-		# O Fominha tentou o drible e foi desarmado limpo pelo zagueiro da IA
-		gs.grant_xp(1)
-		SFX.play_turnover()
-		
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		var marker_slot = Matchups.ai_slot_for_role(gs, marker.get("role", "ZAG"))
-		var fail_msg = Narration.TACKLE_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")]
-		
-		# Transfere a posse de bola para a IA no local do desarme (SEM PÊNALTI E SEM FALTA)
-		AIOpponent.reset_possession(fail_msg, marker_slot)
-		gs.momentum_bonus = 0
+
+		# 🎯 Avalia se o zagueiro da IA cometeu falta tentando parar o drible
+		var decision = Referee.evaluate_foul(gs, "DRIBBLE_FOUL", false)
+
+		if decision == Referee.Decision.PENALTY:
+			# 🚨 FALTA DA IA DENTRO DA PRÓPRIA ÁREA -> PÊNALTI A SEU FAVOR
+			gs.grant_xp(1)
+			Referee.process_cards(gs, marker_slot, marker, false, false)
+			gs.push_log(Narration.FOUL_COMMITTED.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+			PenaltyEngine.execute_penalty(gs, true)
+
+		elif decision == Referee.Decision.FOUL:
+			# ⚠️ FALTA COMUM DA IA: a vantagem fica com quem foi driblado —
+			# o lance segue e o drible é considerado bem-sucedido
+			gs.grant_xp(5)
+			Referee.process_cards(gs, marker_slot, marker, false, false)
+			gs.push_log(Narration.FOUL_COMMITTED.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+
+			Stats.dribble_success()
+			gs.streak += 1
+			SFX.play_dribble()
+			gs.momentum_bonus = 22
+
+		else:
+			# ❌ TENTATIVA DE DRIBLE FALHOU (desarme limpo, sem falta):
+			# O atacante tentou o drible e foi desarmado limpo pelo zagueiro da IA
+			gs.grant_xp(1)
+			SFX.play_turnover()
+
+			var fail_msg = Narration.TACKLE_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")]
+
+			# Transfere a posse de bola para a IA no local do desarme (SEM PÊNALTI E SEM FALTA)
+			AIOpponent.reset_possession(fail_msg, marker_slot)
+			gs.momentum_bonus = 0
 		
 static func _do_feint(gs: Node) -> void:
 	var active_roster_idx = gs.starters[gs.active_idx]
@@ -228,14 +252,23 @@ static func chance_for(gs: Node, stat_name: String) -> int:
 		marker_stat = "BLQ"
 
 	var marker = Matchups.opponent_marker_for_player(gs, gs.active_player())
+
+	# 🟥 Zona desprotegida: marcador da IA expulso, ataque passa livre
+	if marker.get("is_ejected", false):
+		return 100
+
 	var difficulty = marker.get(marker_stat, 50) + gs._difficulty_bonus()
 	return Rules.success_chance(gs.active_player().get(stat_name, 50), difficulty, gs.momentum_bonus, tb)
 
 
 static func feint_chance(gs: Node) -> int:
 	var p = gs.active_player()
-	var stat_avg = (p.get("DRI", 50) + p.get("SHO", 50)) / 2.0
 	var marker = Matchups.opponent_marker_for_player(gs, p)
+
+	if marker.get("is_ejected", false):
+		return 100
+
+	var stat_avg = (p.get("DRI", 50) + p.get("SHO", 50)) / 2.0
 	var marker_avg = (marker.get("TAC", 50) + marker.get("BLQ", 50)) / 2.0
 	var tb = gs.trait_bonus("FEINT")
 	return Rules.success_chance(stat_avg, marker_avg + 8 + gs._difficulty_bonus(), gs.momentum_bonus, tb, 5, 90)
@@ -243,18 +276,26 @@ static func feint_chance(gs: Node) -> int:
 
 static func long_shot_chance(gs: Node) -> int:
 	var marker = Matchups.opponent_marker_for_player(gs, gs.active_player())
+
+	if marker.get("is_ejected", false):
+		return 100
+
 	var tb = gs.trait_bonus("LONG_SHO")
 	return Rules.success_chance(gs.active_player().get("SHO", 50), marker.get("BLQ", 50) + 20 + gs._difficulty_bonus(), gs.momentum_bonus, tb, 5, 85)
 
 
 static func pass_chance_to(gs: Node, target_idx: int) -> int:
 	var target = gs.squad[target_idx]
+	var marker = Matchups.opponent_marker_for_player(gs, target)
+
+	if marker.get("is_ejected", false):
+		return 100
+
 	var distance = abs(target_idx - gs.zone_idx)
 	var adjacent_bonus = 14 if distance == 1 else 0
 	var distance_penalty = max(0, distance - 1) * 15
 	var momentum_effect = (gs.momentum_bonus * 1.5) if distance >= 2 else float(gs.momentum_bonus)
 
-	var marker = Matchups.opponent_marker_for_player(gs, target)
 	var tb = gs.trait_bonus("PASS")
 	var effective_difficulty = marker.get("INT", 50) + distance_penalty - adjacent_bonus + gs._difficulty_bonus()
 	return Rules.success_chance(gs.active_player().get("PAS", 50), effective_difficulty, momentum_effect, tb)
@@ -275,7 +316,7 @@ static func kickoff(gs: Node, start_with_player: bool = true) -> void:
 			gs.push_log(msg)
 
 	else:
-		var opp_squad = gs.current_opponent_team().get("squad", [])
+		var opp_squad = gs.opponent_squad
 		var zag_zone = 3
 		for i in range(opp_squad.size()):
 			if opp_squad[i].get("role", "") == "ZAG":

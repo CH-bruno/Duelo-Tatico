@@ -52,15 +52,14 @@ static func evaluate_foul(gs: Node, foul_context: String, is_player_foul: bool =
 	return Decision.NONE
 
 
-# No Referee.gd:
-
+# 🎯 roster_idx: para faltas do jogador é o índice do RosterData; para
+# faltas da IA é o índice DENTRO do squad do time adversário (0..3).
 static func process_cards(gs: Node, roster_idx: int, player_dict: Dictionary, is_slide: bool = false, is_player_foul: bool = true) -> String:
 	var card_roll = randi_range(1, 100)
 	var yellow_threshold = 75 if is_slide else 25
 	
 	var p_name = player_dict.get("name", "Jogador")
 	var p_role = player_dict.get("role", "DEF")
-
 	var target_yellows = gs.yellow_cards if is_player_foul else gs.ai_yellow_cards
 
 	if card_roll <= yellow_threshold:
@@ -73,7 +72,7 @@ static func process_cards(gs: Node, roster_idx: int, player_dict: Dictionary, is
 		else:
 			# 🟨 PRIMEIRO AMARELO
 			target_yellows[roster_idx] = true
-			player_dict["has_yellow"] = true
+			_refresh_lineup(gs, is_player_foul)
 			gs.push_log(Narration.YELLOW_CARD.pick_random() % [p_name, p_role])
 			SFX.play_whistle()
 			return "YELLOW"
@@ -92,9 +91,20 @@ static func _eject_player(gs: Node, roster_idx: int, player_dict: Dictionary, is
 	if is_player_foul:
 		if not (roster_idx in gs.players_out):
 			gs.players_out.append(roster_idx)
-		player_dict["is_ejected"] = true
-		gs._apply_lineup()
 	else:
 		if not (roster_idx in gs.ai_players_out):
 			gs.ai_players_out.append(roster_idx)
-		player_dict["is_ejected"] = true
+
+	_refresh_lineup(gs, is_player_foul)
+
+
+# ⚠️ Nunca escreve "is_ejected"/"has_yellow" direto no dicionário do
+# jogador — squad e opponent_squad são sempre RECONSTRUÍDOS a partir de
+# players_out/yellow_cards e ai_players_out/ai_yellow_cards (fonte de
+# verdade). Isso evita corromper permanentemente os dados originais de
+# RosterData/OpponentTeams.
+static func _refresh_lineup(gs: Node, is_player_foul: bool) -> void:
+	if is_player_foul:
+		gs._apply_lineup()
+	else:
+		gs._apply_opponent_lineup()

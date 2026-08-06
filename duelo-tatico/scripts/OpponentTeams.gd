@@ -52,7 +52,10 @@ const TEAMS = [
 
 static func team_for_stage(stage: int) -> Dictionary:
 	var idx = clampi(stage - 1, 0, TEAMS.size() - 1)
-	return TEAMS[idx]
+	# 🔒 Cópia profunda: TEAMS é const e compartilhado por toda a sessão do
+	# jogo. Sem isso, cartões/expulsões da IA gravados aqui vazariam pra
+	# qualquer partida futura contra o mesmo time, pra sempre.
+	return TEAMS[idx].duplicate(true)
 
 
 static func team_for_challenge(wins: int) -> Dictionary:
@@ -70,3 +73,20 @@ static func team_for_challenge(wins: int) -> Dictionary:
 				player[stat] = min(99, player[stat] + (loops * 3))
 				
 	return base_team
+
+
+# 🔄 Constrói (uma vez por partida) o squad ativo do adversário: parte
+# sempre dos dados originais (via current_opponent_team(), já duplicados)
+# e aplica cartão/expulsão a partir de ai_players_out / ai_yellow_cards no
+# GameState — nunca escreve de volta em TEAMS.
+static func build_active_squad(gs: Node) -> Array:
+	var raw_squad: Array = gs.current_opponent_team().get("squad", [])
+	var final_squad: Array = []
+
+	for i in range(raw_squad.size()):
+		var p = raw_squad[i]
+		p["is_ejected"] = i in gs.ai_players_out
+		p["has_yellow"] = gs.ai_yellow_cards.get(i, false)
+		final_squad.append(p)
+
+	return final_squad
