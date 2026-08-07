@@ -22,6 +22,10 @@ var block_button: Button
 var slide_button: Button
 var attack_container: HBoxContainer
 
+# 🛡️ Evita agendar _move_succeeds() mais de uma vez enquanto a chamada
+# adiada da zona desprotegida ainda não rodou.
+var _undefended_zone_pending := false
+
 
 func setup(nodes: Dictionary) -> void:
 	zone_label = nodes["zone_label"]
@@ -169,8 +173,16 @@ func refresh() -> void:
 		block_button.visible = false
 		if slide_button: slide_button.visible = false
 		
-		GameState.push_log("⚠️ Zona desprotegida (%s expulso)! O rival avança sem marcação." % defender.get("name", "Jogador"))
-		AIOpponent._move_succeeds()
+		# 🕒 Adiado pro próximo frame: chamar _move_succeeds() aqui dentro,
+		# de forma síncrona, aninharia um novo state_changed.emit() DENTRO
+		# deste refresh() (que já está respondendo a um state_changed) —
+		# é isso que fazia a bola/coluna em destaque "grudar" no jogador
+		# errado quando o passe automático troca de portador da bola.
+		if not _undefended_zone_pending:
+			_undefended_zone_pending = true
+			GameState.push_log("⚠️ Zona desprotegida (%s expulso)! O rival avança sem marcação." % defender.get("name", "Jogador"))
+			call_deferred("_resolve_undefended_zone")
+		
 		_render_logs()
 		return
 
@@ -237,6 +249,11 @@ func refresh() -> void:
 
 	# 4. LOG DE NARRAÇÃO
 	_render_logs()
+
+
+func _resolve_undefended_zone() -> void:
+	_undefended_zone_pending = false
+	AIOpponent._move_succeeds()
 
 
 func _render_logs() -> void:

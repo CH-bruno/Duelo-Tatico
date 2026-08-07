@@ -112,6 +112,11 @@ static func _do_dribble(gs: Node) -> void:
 			gs.grant_xp(1)
 			Referee.process_cards(gs, marker_slot, marker, false, false)
 			gs.push_log(Narration.FOUL_COMMITTED.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+
+			# 🟥 Se essa expulsão decretou WO, o jogo já acabou — não cobra o pênalti
+			if gs.match_over:
+				return
+
 			PenaltyEngine.execute_penalty(gs, true)
 
 		elif decision == Referee.Decision.FOUL:
@@ -120,6 +125,10 @@ static func _do_dribble(gs: Node) -> void:
 			gs.grant_xp(5)
 			Referee.process_cards(gs, marker_slot, marker, false, false)
 			gs.push_log(Narration.FOUL_COMMITTED.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+
+			# 🟥 Se essa expulsão decretou WO, o jogo já acabou — não segue o lance
+			if gs.match_over:
+				return
 
 			Stats.dribble_success()
 			gs.streak += 1

@@ -238,6 +238,12 @@ static func defend(action: String) -> void:
 		if decision == Referee.Decision.PENALTY:
 			# 🚨 PÊNALTI CONTRA O JOGADOR (Falta no CA da IA dentro da sua área)
 			Referee.process_cards(GameState, defender_roster_idx, defender_dict, action == "SLIDE")
+
+			# 🟥 Se essa expulsão decretou WO, o jogo já acabou — não cobra o pênalti
+			if GameState.match_over:
+				GameState.state_changed.emit()
+				return
+
 			PenaltyEngine.execute_penalty(GameState, false)
 			return
 		elif decision == Referee.Decision.FOUL:
@@ -248,7 +254,12 @@ static func defend(action: String) -> void:
 				GameState.push_log(_format_narration(Narration.FOUL_SLIDE.pick_random(), [def_name, def_role, att_name, att_role]))
 			else:
 				GameState.push_log(_format_narration(Narration.FOUL_COMMITTED.pick_random(), [def_name, def_role, att_name, att_role]))
-				
+
+			# 🟥 Se essa expulsão decretou WO, o jogo já acabou — não segue o lance
+			if GameState.match_over:
+				GameState.state_changed.emit()
+				return
+
 			_move_succeeds()
 			return
 		else:

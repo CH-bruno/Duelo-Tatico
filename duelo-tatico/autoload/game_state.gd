@@ -20,6 +20,7 @@ const MAX_ROUNDS = 30
 var first_half: bool = true
 var yellow_cards: Dictionary = {}
 var game_mode: GameMode = GameMode.CAMPAIGN
+var walkover_winner: String = "" # "" | "PLAYER" | "AI"
 
 var goals: int = 0
 var ai_goals: int = 0
@@ -136,6 +137,7 @@ func reset_substitutions() -> void:
 	# 🧹 Limpa os cartões e expulsões da IA também!
 	ai_yellow_cards.clear()
 	ai_players_out.clear()
+	walkover_winner = ""
 	_apply_lineup()
 	
 func can_substitute() -> bool:

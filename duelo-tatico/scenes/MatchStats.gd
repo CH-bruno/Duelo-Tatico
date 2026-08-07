@@ -1,5 +1,5 @@
 extends Control
-# MatchStats.gd — Overlay de Estatísticas Pós-Jogo (Refatorado com AppTheme).
+# MatchStats.gd — Overlay de Estatísticas Pós-Jogo (Com suporte a W.O.).
 
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
@@ -38,7 +38,10 @@ func _ready():
 	if grid:
 		grid.columns = 2
 
-	# Conexão do botão de fechar
+	# 🏆 AVALIAÇÃO DE VITÓRIA / DERROTA (RESPEITA W.O.)
+	var is_victory := _is_player_winner()
+
+	# Configuração do botão de fechar/avançar
 	if close_button:
 		close_button.mouse_filter = Control.MOUSE_FILTER_STOP
 		UIUtils.add_press_feedback(close_button)
@@ -46,7 +49,7 @@ func _ready():
 		if not close_button.pressed.is_connected(_on_close_pressed):
 			close_button.pressed.connect(_on_close_pressed)
 
-		if GameState.goals > GameState.ai_goals:
+		if is_victory:
 			if GameState.campaign_stage >= GameState.MAX_CAMPAIGN_STAGE:
 				close_button.text = "Concluir Campanha"
 			else:
@@ -56,7 +59,13 @@ func _ready():
 
 	# Configuração do título de resultado
 	if title_label:
-		if GameState.goals > GameState.ai_goals:
+		if GameState.walkover_winner == "PLAYER":
+			title_label.text = "VITÓRIA POR W.O.!"
+			title_label.add_theme_color_override("font_color", AppTheme.GOLD)
+		elif GameState.walkover_winner == "AI":
+			title_label.text = "DERROTA POR W.O.!"
+			title_label.add_theme_color_override("font_color", AppTheme.DANGER)
+		elif GameState.goals > GameState.ai_goals:
 			title_label.text = "VITÓRIA!"
 			title_label.add_theme_color_override("font_color", AppTheme.GOLD)
 		elif GameState.goals == GameState.ai_goals:
@@ -67,6 +76,13 @@ func _ready():
 			title_label.add_theme_color_override("font_color", AppTheme.DANGER)
 
 	_load_stats()
+
+
+# 🎯 Checagem centralizada de vencedor
+func _is_player_winner() -> bool:
+	if GameState.walkover_winner != "":
+		return GameState.walkover_winner == "PLAYER"
+	return GameState.goals > GameState.ai_goals
 
 
 func _load_stats():
@@ -164,7 +180,7 @@ func add_stat(nome: String, valor: String) -> void:
 func _on_close_pressed():
 	queue_free()
 
-	if GameState.goals > GameState.ai_goals:
+	if _is_player_winner():
 		if GameState.game_mode == GameState.GameMode.CAMPAIGN:
 			if GameState.campaign_stage < GameState.MAX_CAMPAIGN_STAGE:
 				GameState.next_match()
