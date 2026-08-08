@@ -1,160 +1,233 @@
-extends ColorRect
-# SubstitutionDialog.gd — Modal de Substituição Expandido e Detalhado
-
-const AppTheme = preload("res://scripts/AppTheme.gd")
+extends Control
+# SubstitutionDialog.gd — Modal de Substituições Totalmente Centralizado e Responsivo.
 
 signal closed
 
-# Função utilitária para ícones de bateria
-func _stamina_icon(st: int) -> String:
-	if st >= 75:
-		return "🔋"
-	elif st >= 40:
-		return "🪫"
-	else:
-		return "🪫"
+const AppTheme = preload("res://scripts/AppTheme.gd")
+const UIUtils = preload("res://scripts/UIUtils.gd")
+
+var title_label: Label
+var container: VBoxContainer
+var close_button: Button
 
 
-func setup() -> void:
-	color = Color(0, 0, 0, 0.75)
-	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-
-	var panel = PanelContainer.new()
-	panel.name = "DialogPanel"
-	panel.custom_minimum_size = Vector2(540, 0)
+func _ready():
+	theme = AppTheme.build()
 	
-	panel.anchor_left = 0.5
-	panel.anchor_top = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_bottom = 0.5
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	panel.grow_vertical = Control.GROW_DIRECTION_BOTH
+	# 📐 Garante expansão total na tela inteira
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	anchor_right = 1.0
+	anchor_bottom = 1.0
+	offset_left = 0
+	offset_top = 0
+	offset_right = 0
+	offset_bottom = 0
+	
+	mouse_filter = Control.MOUSE_FILTER_STOP
 
-	var style = StyleBoxFlat.new()
-	style.bg_color = AppTheme.PANEL
-	style.border_color = AppTheme.GOLD
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(10)
-	style.set_content_margin_all(18)
-	panel.add_theme_stylebox_override("panel", style)
-	add_child(panel)
-
-	_build_ui(panel)
+	_build_dialog_structure()
+	setup()
 
 
-func _build_ui(panel: PanelContainer) -> void:
-	for child in panel.get_children():
-		panel.remove_child(child)
+# 🛠️ Constrói a estrutura visual totalmente centralizada
+func _build_dialog_structure() -> void:
+	# 1. Fundo Escuro Transparente Cobrindo 100% da Tela
+	var bg = ColorRect.new()
+	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	bg.color = Color(0, 0, 0, 0.75)
+	bg.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(bg)
+
+	# 2. Container Centralizador
+	var center_container = CenterContainer.new()
+	center_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(center_container)
+
+	# 3. Painel de Fundo Fixo e Centralizado
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(620, 440)
+	
+	var panel_style = StyleBoxFlat.new()
+	panel_style.bg_color = AppTheme.PANEL
+	panel_style.border_color = AppTheme.GOLD
+	panel_style.set_border_width_all(1)
+	panel_style.set_corner_radius_all(10)
+	panel_style.set_content_margin_all(16)
+	panel.add_theme_stylebox_override("panel", panel_style)
+	center_container.add_child(panel)
+
+	var main_vbox = VBoxContainer.new()
+	main_vbox.add_theme_constant_override("separation", 12)
+	panel.add_child(main_vbox)
+
+	# 4. Título
+	title_label = Label.new()
+	title_label.text = "🔄 SUBSTITUIÇÕES"
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.add_theme_color_override("font_color", AppTheme.GOLD)
+	title_label.add_theme_font_size_override("font_size", 16)
+	main_vbox.add_child(title_label)
+
+	# 5. Lista de Substituições com Scroll
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main_vbox.add_child(scroll)
+
+	container = VBoxContainer.new()
+	container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	container.add_theme_constant_override("separation", 10)
+	scroll.add_child(container)
+
+	# 6. Botão de Fechar / Voltar
+	close_button = Button.new()
+	close_button.text = "Voltar ao Jogo ►"
+	close_button.custom_minimum_size = Vector2(0, 36)
+	close_button.pressed.connect(_on_close_pressed)
+	UIUtils.add_press_feedback(close_button)
+	main_vbox.add_child(close_button)
+
+
+func setup():
+	if title_label:
+		title_label.text = "🔄 SUBSTITUIÇÕES (%d restantes)" % GameState.substitutions_left
+
+	_rebuild_list()
+
+
+func _rebuild_list():
+	if not container:
+		return
+
+	for child in container.get_children():
 		child.queue_free()
 
-	var vbox = VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	panel.add_child(vbox)
-
-	# Título
-	var title = Label.new()
-	title.text = "🔄 SUBSTITUIÇÕES (%d restantes)" % GameState.substitutions_left
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 16)
-	title.add_theme_color_override("font_color", AppTheme.GOLD)
-	vbox.add_child(title)
-
-	vbox.add_child(HSeparator.new())
-
-	# Garante que não iteraremos além das posições configuradas no starters
-	var max_roles = min(RosterData.ROLES.size(), GameState.starters.size())
-
-	# Linhas das posições válidas
-	for role_idx in range(max_roles):
-		var role = RosterData.ROLES[role_idx]
-		
-		# Validação de segurança contra índices fora do limite do array de titulares
+	# Itera pelos 4 slots de titulares (0: ZAG, 1: VOL, 2: MEI, 3: CA)
+	for role_idx in range(GameState.squad.size()):
+		var starter_player = GameState.squad[role_idx]
 		var starter_roster_idx = GameState.starters[role_idx]
-		if starter_roster_idx < 0 or starter_roster_idx >= RosterData.ROSTER.size():
-			continue
+		var starter_stamina = GameState.get_stamina(starter_roster_idx)
+		var is_ejected = starter_player.get("is_ejected", false)
 
-		var starter_p = RosterData.ROSTER[starter_roster_idx]
-		var st = int(GameState.get_stamina(starter_roster_idx))
+		# --- CARD DO SLOT TÁTICO ---
+		var card = PanelContainer.new()
+		var card_style = StyleBoxFlat.new()
+		card_style.bg_color = AppTheme.BACKGROUND.lightened(0.03)
+		card_style.border_color = AppTheme.GOLD.darkened(0.4)
+		card_style.set_border_width_all(1)
+		card_style.set_corner_radius_all(6)
+		card_style.set_content_margin_all(8)
+		card.add_theme_stylebox_override("panel", card_style)
 
-		var row = HBoxContainer.new()
-		row.add_theme_constant_override("separation", 10)
+		var card_hbox = HBoxContainer.new()
+		card_hbox.add_theme_constant_override("separation", 12)
+		card.add_child(card_hbox)
 
-		# Coluna 1: Informações do Titular Atual
-		var lbl_starter = Label.new()
-		lbl_starter.text = "[%s] %s  %s %d%%" % [role, starter_p["name"], _stamina_icon(st), st]
-		lbl_starter.custom_minimum_size = Vector2(210, 0)
-		lbl_starter.add_theme_font_size_override("font_size", 12)
-		if st < 50:
-			lbl_starter.add_theme_color_override("font_color", AppTheme.DANGER)
-		row.add_child(lbl_starter)
+		# 1. LADO ESQUERDO: TITULAR
+		var starter_vbox = VBoxContainer.new()
+		starter_vbox.custom_minimum_size = Vector2(170, 0)
+		starter_vbox.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 
-		# Seta Indicadora
-		var lbl_arrow = Label.new()
-		lbl_arrow.text = "➔"
-		lbl_arrow.add_theme_font_size_override("font_size", 11)
-		lbl_arrow.add_theme_color_override("font_color", AppTheme.MUTED)
-		row.add_child(lbl_arrow)
+		var lbl_role = Label.new()
+		lbl_role.text = "[%s] TITULAR" % starter_player.get("role", RosterData.ROLES[role_idx])
+		lbl_role.add_theme_font_size_override("font_size", 10)
+		lbl_role.add_theme_color_override("font_color", AppTheme.GOLD)
+		starter_vbox.add_child(lbl_role)
 
-		# Coluna 2: Informações do Reserva e Botão [Trocar]
-		var bench_candidates = LineupManager.available_bench_for(GameState, role_idx)
-
-		if bench_candidates.size() > 0 and GameState.substitutions_left > 0:
-			var bench_container = VBoxContainer.new()
-			bench_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			
-			for bench_idx in bench_candidates:
-				if bench_idx < 0 or bench_idx >= RosterData.ROSTER.size():
-					continue
-
-				var bench_p = RosterData.ROSTER[bench_idx]
-				var bench_st = int(GameState.get_stamina(bench_idx))
-
-				var sub_row = HBoxContainer.new()
-				sub_row.add_theme_constant_override("separation", 8)
-
-				# Nome + Posição + Stamina
-				var lbl_bench = Label.new()
-				lbl_bench.text = "%s (%s)  %s %d%%" % [bench_p["name"], bench_p["role"], _stamina_icon(bench_st), bench_st]
-				lbl_bench.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				lbl_bench.add_theme_font_size_override("font_size", 11)
-				sub_row.add_child(lbl_bench)
-
-				# Botão compacto "Trocar"
-				var btn_sub = Button.new()
-				btn_sub.text = "Trocar"
-				btn_sub.custom_minimum_size = Vector2(75, 26)
-				btn_sub.add_theme_font_size_override("font_size", 10)
-
-				var current_role_idx = role_idx
-				var current_bench_idx = bench_idx
-
-				btn_sub.pressed.connect(func():
-					if GameState.make_substitution(current_role_idx, current_bench_idx):
-						_build_ui(panel)
-				)
-				sub_row.add_child(btn_sub)
-				bench_container.add_child(sub_row)
-
-			row.add_child(bench_container)
+		var lbl_starter_name = Label.new()
+		lbl_starter_name.text = starter_player.get("name", "Jogador")
+		if is_ejected:
+			lbl_starter_name.text = "🟥 " + lbl_starter_name.text + " [EXPULSO]"
+			lbl_starter_name.add_theme_color_override("font_color", AppTheme.DANGER)
 		else:
-			var lbl_no_sub = Label.new()
-			lbl_no_sub.text = "Sem opções" if bench_candidates.size() == 0 else "Esgotado"
-			lbl_no_sub.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			lbl_no_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			lbl_no_sub.add_theme_font_size_override("font_size", 11)
-			lbl_no_sub.add_theme_color_override("font_color", AppTheme.MUTED)
-			row.add_child(lbl_no_sub)
+			lbl_starter_name.add_theme_color_override("font_color", AppTheme.TEXT_COLOR)
+		lbl_starter_name.add_theme_font_size_override("font_size", 13)
+		starter_vbox.add_child(lbl_starter_name)
 
-		vbox.add_child(row)
+		var lbl_starter_stamina = Label.new()
+		lbl_starter_stamina.text = "🔋 %d%%" % int(starter_stamina)
+		lbl_starter_stamina.add_theme_font_size_override("font_size", 11)
+		starter_vbox.add_child(lbl_starter_stamina)
 
-	vbox.add_child(HSeparator.new())
+		card_hbox.add_child(starter_vbox)
 
-	# Botão Voltar ao Jogo
-	var btn_close = Button.new()
-	btn_close.text = "Voltar ao Jogo ▶"
-	btn_close.custom_minimum_size = Vector2(0, 34)
-	btn_close.pressed.connect(func():
-		closed.emit()
-		queue_free()
-	)
-	vbox.add_child(btn_close)
+		# DIVISOR / SETA
+		var arrow = Label.new()
+		arrow.text = "➔"
+		arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		arrow.add_theme_color_override("font_color", AppTheme.GOLD.darkened(0.2))
+		card_hbox.add_child(arrow)
+
+		# 2. LADO DIREITO: RESERVAS DA POSIÇÃO
+		var bench_vbox = VBoxContainer.new()
+		bench_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bench_vbox.add_theme_constant_override("separation", 6)
+
+		var candidates = RosterData.candidates_for(role_idx)
+		var bench_count = 0
+
+		for candidate_idx in candidates:
+			if candidate_idx == starter_roster_idx:
+				continue # Pula o titular que já está jogando
+
+			bench_count += 1
+			var candidate_data = RosterData.ROSTER[candidate_idx]
+			var candidate_stamina = GameState.get_stamina(candidate_idx)
+
+			var sub_row = HBoxContainer.new()
+			sub_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+			# Informações do Reserva
+			var lbl_cand = Label.new()
+			lbl_cand.text = "%s (%s)  🔋 %d%%" % [
+				candidate_data["name"],
+				candidate_data["role"],
+				int(candidate_stamina)
+			]
+			lbl_cand.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			lbl_cand.add_theme_font_size_override("font_size", 12)
+			sub_row.add_child(lbl_cand)
+
+			# Botão de Trocar
+			var btn_sub = Button.new()
+			btn_sub.text = "Trocar"
+			btn_sub.custom_minimum_size = Vector2(80, 26)
+			
+			var can_swap = (GameState.substitutions_left > 0) and not GameState.match_over and not is_ejected
+			btn_sub.disabled = not can_swap
+
+			var c_idx = candidate_idx
+			var r_idx = role_idx
+			btn_sub.pressed.connect(func(): _do_substitute(r_idx, c_idx))
+			UIUtils.add_press_feedback(btn_sub)
+
+			sub_row.add_child(btn_sub)
+			bench_vbox.add_child(sub_row)
+
+		if bench_count == 0:
+			var lbl_empty = Label.new()
+			lbl_empty.text = "Sem reservas disponíveis"
+			lbl_empty.add_theme_font_size_override("font_size", 11)
+			lbl_empty.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6))
+			bench_vbox.add_child(lbl_empty)
+
+		card_hbox.add_child(bench_vbox)
+		container.add_child(card)
+
+
+func _do_substitute(role_idx: int, new_roster_idx: int):
+	if GameState.substitutions_left <= 0:
+		return
+
+	var old_player_name = GameState.squad[role_idx]["name"]
+	GameState.substitute(role_idx, new_roster_idx)
+	var new_player_name = GameState.squad[role_idx]["name"]
+
+	GameState.push_log("🔄 Substituição: Entra %s no lugar de %s!" % [new_player_name, old_player_name])
+
+	setup()
+
+
+func _on_close_pressed():
+	closed.emit()
+	queue_free()

@@ -44,7 +44,7 @@ class PitchView extends Control:
 		draw_rect(Rect2(center_x - 45, 0, 90, 35), line_color, false, 1.5)
 		draw_rect(Rect2(center_x - 45, size.y - 35, 90, 35), line_color, false, 1.5)
 
-		# Titulares
+		# Titulares (ZAG, VOL, MEI, CA)
 		var roles_y_pct = [0.82, 0.62, 0.42, 0.22] # ZAG, VOL, MEI, CA
 		var font = ThemeDB.fallback_font
 		var font_size = 11
@@ -245,7 +245,7 @@ func _update_comparison_cards():
 		starter_stamina,
 		starter,
 		AppTheme.GOLD,
-		null # Sem comparação de atributos, é a base
+		null
 	)
 	card_starter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cards_hbox.add_child(card_starter)
@@ -276,7 +276,7 @@ func _update_comparison_cards():
 			candidate_stamina,
 			candidate_stats,
 			AppTheme.SUCCESS,
-			starter # Passa os atributos do titular para calcular diferenças (+ / -)
+			starter
 		)
 		card_candidate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cards_hbox.add_child(card_candidate)
@@ -333,7 +333,6 @@ func _create_player_card(p_name: String, role: String, trait_str: String, stamin
 		lbl_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		lbl_val.add_theme_font_size_override("font_size", 11)
 
-		# Se for o Card do Reserva, compara os valores com os do Titular
 		if base_stats != null:
 			var diff = val - base_stats[code]
 			if diff > 0:

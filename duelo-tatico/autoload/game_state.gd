@@ -33,14 +33,13 @@ var challenge_wins: int = 0
 var challenge_best: int = 0
 
 # ---------- 2. LINEUP & FADIGA ----------
-var starters: Array = [0, 2, 4, 6]
+# Titulares Padrão Fixos: 0 (Rocha - ZAG), 3 (Diego - VOL), 6 (Armando - MEI), 9 (Fominha - CA)
+var starters: Array[int] = [0, 3, 6, 9]
 var squad: Array = []
 var player_stamina: Dictionary = {}
 var substitutions_left: int = 2
 var players_out: Array = []
 var players_who_played: Array = []
-# 🚫 Jogadores que já saíram por substituição nesta partida — não podem
-# voltar a jogar até a próxima partida (regra do futebol).
 var subbed_out_players: Array = []
 
 # ---------- 3. POSSE & TURNO ----------
@@ -58,9 +57,6 @@ var ai_active_idx: int = 0
 var ai_momentum: int = 0
 var ai_yellow_cards: Dictionary = {}
 var ai_players_out: Array = []
-# 🔒 Squad ativo do adversário para a partida atual — construído 1x por
-# partida a partir de OpponentTeams (que nunca é mutado diretamente) e
-# atualizado sempre que um cartão/expulsão da IA acontece.
 var opponent_squad: Array = []
 
 # ---------- 5. XP ----------
@@ -104,7 +100,6 @@ func reset_match_stats() -> void:
 	for roster_idx in starters:
 		if not (roster_idx in players_who_played):
 			players_who_played.append(roster_idx)
-			
 
 func match_stats() -> Dictionary:
 	return Stats.to_dict()
@@ -137,18 +132,41 @@ func reset_substitutions() -> void:
 	players_out.clear()
 	yellow_cards.clear()
 	subbed_out_players.clear()
+	players_who_played.clear()
 	
-	# 🧹 Limpa os cartões e expulsões da IA também!
+	# 🧹 Limpa os cartões, W.O. e expulsões da IA
 	ai_yellow_cards.clear()
 	ai_players_out.clear()
 	walkover_winner = ""
+
+	# 🛡️ Proteção do Time Titular Padrão: garante que haja 1 jogador por posição
+	if starters.size() < 4 or _has_invalid_starters():
+		starters = [0, 3, 6, 9]
+
+	players_who_played = starters.duplicate()
 	_apply_lineup()
-	
+
+# 🛡️ Valida se os titulares contêm papéis duplicados ou inválidos
+func _has_invalid_starters() -> bool:
+	var used_roles: Array[String] = []
+	for roster_idx in starters:
+		if roster_idx >= RosterData.ROSTER.size():
+			return true
+		var role = RosterData.ROSTER[roster_idx].get("role", "")
+		if role in used_roles:
+			return true
+		used_roles.append(role)
+	return false
+
 func can_substitute() -> bool:
 	return substitutions_left > 0
 
 func make_substitution(role_idx: int, new_roster_idx: int) -> bool:
 	return LineupManager.make_substitution(self, role_idx, new_roster_idx)
+
+# 🔄 Método atalho para chamadas do SubstitutionDialog
+func substitute(role_idx: int, new_roster_idx: int) -> bool:
+	return make_substitution(role_idx, new_roster_idx)
 	
 # 💤 Aplica a regra entre jogos: QUEM JOGOU mantém a energia; QUEM DESCANSOU recupera 100%
 func apply_match_fatigue() -> void:
@@ -170,9 +188,6 @@ func set_lineup(new_starters: Array) -> void:
 func _apply_lineup() -> void:
 	squad = LineupManager.apply_lineup(self)
 
-# 🔄 Reconstrói o squad do adversário a partir dos dados originais em
-# OpponentTeams + as flags de cartão/expulsão vindas de ai_players_out /
-# ai_yellow_cards (fonte de verdade). Nunca escreve de volta em OpponentTeams.
 func _apply_opponent_lineup() -> void:
 	opponent_squad = OpponentTeams.build_active_squad(self)
 
@@ -180,13 +195,10 @@ func active_player() -> Dictionary:
 	var safe_idx = clampi(active_idx, 0, max(0, squad.size() - 1))
 	return squad[safe_idx] if not squad.is_empty() else {}
 
-# 🛡️ Defensor Ativo com Cobertura Inteligente (Se o marcador original estiver expulso)
 func active_defender() -> Dictionary:
 	var def_dict = Matchups.player_defender_for_ai(self, ai_active_player())
 	
-	# Se o marcador direto (ex: ZAG) foi expulso, busca o companheiro não-expulso mais próximo
 	if def_dict.get("is_ejected", false):
-		# Prioridade de Cobertura: VOL -> MEI -> CA
 		for p in squad:
 			if not p.get("is_ejected", false):
 				return p
@@ -210,12 +222,10 @@ func trait_bonus(action: String) -> int:
 func player_gets_ball() -> void:
 	MatchEngine.player_gets_ball(self)
 	
-	# Se o portador da bola estivesse expulso, passa a posse para o companheiro válido mais próximo
 	if active_player().get("is_ejected", false):
 		for i in range(squad.size()):
 			if not squad[i].get("is_ejected", false):
 				active_idx = i
-				# Mantém zone_idx consistente com a posição no campo, sem forçar sobrescrita errada
 				break
 
 func recover_possession(defender_idx: int) -> void:
@@ -234,9 +244,6 @@ func current_opponent_team() -> Dictionary:
 func opponent_team_name() -> String:
 	return current_opponent_team().get("name", "Adversário")
 
-# ⚠️ Usa sempre o cache (opponent_squad), nunca current_opponent_team()
-# direto — é o único jeito de manter cartões/expulsões da IA visíveis de
-# forma consistente durante a partida, sem vazar pros dados originais.
 func ai_active_player() -> Dictionary:
 	var safe_idx = clampi(ai_active_idx, 0, max(0, opponent_squad.size() - 1))
 	return opponent_squad[safe_idx] if not opponent_squad.is_empty() else {}
@@ -282,9 +289,6 @@ func attempt(action: String, target_idx: int = -1) -> void:
 func next_match() -> void:
 	MatchFlow.next_match(self)
 
-# Chamado quando o jogador confirma a escalação na Campaign Menu e aperta
-# "Iniciar Partida" — só aqui a partida de fato começa (kickoff + registro
-# de quem está jogando para a fadiga pós-jogo).
 func start_campaign_match() -> void:
 	MatchFlow.start_campaign_match(self)
 
