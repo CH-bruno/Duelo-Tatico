@@ -39,6 +39,9 @@ var player_stamina: Dictionary = {}
 var substitutions_left: int = 2
 var players_out: Array = []
 var players_who_played: Array = []
+# 🚫 Jogadores que já saíram por substituição nesta partida — não podem
+# voltar a jogar até a próxima partida (regra do futebol).
+var subbed_out_players: Array = []
 
 # ---------- 3. POSSE & TURNO ----------
 var possession: Possession = Possession.PLAYER
@@ -133,6 +136,7 @@ func reset_substitutions() -> void:
 	substitutions_left = 2
 	players_out.clear()
 	yellow_cards.clear()
+	subbed_out_players.clear()
 	
 	# 🧹 Limpa os cartões e expulsões da IA também!
 	ai_yellow_cards.clear()

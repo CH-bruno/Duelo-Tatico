@@ -104,6 +104,10 @@ static func make_substitution(gs: Node, role_idx: int, new_roster_idx: int) -> b
 	gs.starters[role_idx] = new_roster_idx
 	gs.substitutions_left -= 1
 
+	# 🚫 Quem sai não pode mais voltar nesta mesma partida (regra do futebol)
+	if not (old_roster_idx in gs.subbed_out_players):
+		gs.subbed_out_players.append(old_roster_idx)
+
 	# Registra que o substituto entrou em jogo nesta partida
 	if not (new_roster_idx in gs.players_who_played):
 		gs.players_who_played.append(new_roster_idx)
@@ -142,6 +146,10 @@ static func available_bench_for(gs: Node, role_idx: int) -> Array[int]:
 			continue
 
 		if cand_idx in gs.starters:
+			continue
+
+		# 🚫 Já saiu por substituição nesta partida — não pode voltar
+		if cand_idx in gs.subbed_out_players:
 			continue
 
 		available.append(cand_idx)

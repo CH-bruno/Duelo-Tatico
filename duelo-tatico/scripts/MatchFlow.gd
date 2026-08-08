@@ -84,7 +84,15 @@ static func next_challenge_round(gs: Node) -> void:
 static func reset_game(gs: Node) -> void:
 	# ⚡ REINÍCIO TOTAL: Restaura a energia de 100% de todo o elenco
 	gs.reset_all_stamina()
-	
+
+	# 📉 Reseta a progressão de nível/XP — sem isso, o nível do time
+	# "vazava" de uma campanha pra outra (ex: terminar no nível 6 e
+	# começar a próxima campanha já nesse nível, em vez do 1).
+	gs.level = 1
+	gs.xp = 0
+	gs.pending_xp = 0
+	gs.xp_to_next = 20
+
 	_reset_common_stats(gs)
 	gs.campaign_stage = 1
 	gs.challenge_wins = 0
