@@ -9,14 +9,33 @@ const ROLES: Array[String] = ["ZAG", "VOL", "MEI", "CA"]
 # TAC (Desarme, contra Drible) e BLQ (Bloqueio, contra Chute) = defesa,
 # cada um contando pra um tipo de jogada específico do adversário.
 const ROSTER: Array[Dictionary] = [
+	# ==========================================
+	# 🛡️ ZAGUEIROS (ZAG) - 3 Atletas
+	# ==========================================
 	{"name": "Rocha", "role": "ZAG", "trait": "PAREDE", "PAS": 55, "DRI": 40, "SHO": 25, "INT": 45, "TAC": 50, "BLQ": 75},
-	{"name": "Muralha", "role": "ZAG", "trait": "INTERCEPTADOR", "PAS": 42, "DRI": 30, "SHO": 18, "INT": 80, "TAC": 55, "BLQ": 60},
+	{"name": "Juan", "role": "ZAG", "trait": "INTERCEPTADOR", "PAS": 42, "DRI": 30, "SHO": 18, "INT": 80, "TAC": 55, "BLQ": 60},
+	{"name": "Xandão", "role": "ZAG", "trait": "PAREDE", "PAS": 48, "DRI": 32, "SHO": 20, "INT": 50, "TAC": 58, "BLQ": 82},
+
+	# ==========================================
+	# ⚙️ VOLANTES (VOL) - 3 Atletas
+	# ==========================================
 	{"name": "Diego", "role": "VOL", "trait": "LADRÃO_DE_BOLA", "PAS": 62, "DRI": 50, "SHO": 35, "INT": 45, "TAC": 70, "BLQ": 35},
 	{"name": "Kauê", "role": "VOL", "trait": "INCANSÁVEL", "PAS": 52, "DRI": 45, "SHO": 28, "INT": 50, "TAC": 60, "BLQ": 45},
+	{"name": "Breno", "role": "VOL", "trait": "LADRÃO_DE_BOLA", "PAS": 58, "DRI": 48, "SHO": 32, "INT": 48, "TAC": 74, "BLQ": 40},
+
+	# ==========================================
+	# 🎩 MEIAS (MEI) - 3 Atletas
+	# ==========================================
 	{"name": "Armando", "role": "MEI", "trait": "ARMADOR", "PAS": 70, "DRI": 52, "SHO": 38, "INT": 25, "TAC": 30, "BLQ": 20},
 	{"name": "Rafinha", "role": "MEI", "trait": "ATIRADOR", "PAS": 28, "DRI": 38, "SHO": 78, "INT": 15, "TAC": 15, "BLQ": 15},
+	{"name": "Caio", "role": "MEI", "trait": "ARMADOR", "PAS": 76, "DRI": 58, "SHO": 42, "INT": 20, "TAC": 28, "BLQ": 18},
+
+	# ==========================================
+	# ⚽ CENTROAVANTES (CA) - 3 Atletas
+	# ==========================================
 	{"name": "Fominha", "role": "CA", "trait": "FINALIZADOR", "PAS": 40, "DRI": 50, "SHO": 65, "INT": 20, "TAC": 25, "BLQ": 25},
 	{"name": "Nunes", "role": "CA", "trait": "PRESSÃO_ALTA", "PAS": 58, "DRI": 60, "SHO": 58, "INT": 30, "TAC": 55, "BLQ": 25},
+	{"name": "Bruno", "role": "CA", "trait": "FINALIZADOR", "PAS": 38, "DRI": 52, "SHO": 72, "INT": 18, "TAC": 20, "BLQ": 20}
 ]
 
 static func candidates_for(role_idx: int) -> Array[int]:
@@ -40,7 +59,6 @@ static func trait_name(trait_id: String) -> String:
 		_: return trait_id
 
 static func trait_bonus(player: Dictionary, action: String) -> int:
-	# 🎯 Proteção adicionada: se player for nulo ou não tiver 'trait', retorna 0 em vez de crashar
 	var p_trait: String = player.get("trait", "")
 	if p_trait == "":
 		return 0

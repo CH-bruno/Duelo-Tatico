@@ -167,6 +167,28 @@ func _draw_ball(pos: Vector2):
 	draw_circle(pos + Vector2(-2, -2), 2, Color(1, 1, 1, 0.9))
 
 
+func _draw_stamina_bar(center_bottom: Vector2, stamina: float, font: Font) -> void:
+	var bar_w := 44.0
+	var bar_h := 5.0
+	var pct := clampf(stamina / 100.0, 0.0, 1.0)
+	var top_left := center_bottom - Vector2(bar_w / 2.0, bar_h)
+
+	# Fundo
+	draw_rect(Rect2(top_left, Vector2(bar_w, bar_h)), Color(0, 0, 0, 0.45))
+
+	# Preenchimento (vermelho -> amarelo -> verde conforme a energia)
+	var fill_color = Color(0.85, 0.2, 0.2).lerp(Color(0.3, 0.85, 0.35), pct)
+	if pct > 0.0:
+		draw_rect(Rect2(top_left, Vector2(bar_w * pct, bar_h)), fill_color)
+
+	# Contorno
+	draw_rect(Rect2(top_left, Vector2(bar_w, bar_h)), Color(1, 1, 1, 0.3), false, 1.0)
+
+	# 🔋 Ícone de energia — mesmo padrão usado na tela de Escalação
+	var energy_icon = "🔋" if stamina >= 75.0 else ("🪫" if stamina >= 50.0 else "⚠️")
+	draw_string(font, top_left + Vector2(bar_w + 4, bar_h + 1), energy_icon, HORIZONTAL_ALIGNMENT_LEFT, 20, 12)
+
+
 func _draw():
 	var zone_count = GameState.ZONES.size()
 	var zone_width = size.x / zone_count
@@ -310,6 +332,10 @@ func _draw():
 		var my_color = Color(0.9, 0.3, 0.3) if my_is_ejected else (Color(1.0, 0.85, 0.3) if my_has_yellow else AppTheme.TEXT_COLOR)
 		draw_string(font, Vector2(px - 45, size.y - 48), my_player.get("role", ""), HORIZONTAL_ALIGNMENT_CENTER, 90, font_size, my_color)
 		draw_string(font, Vector2(px - 45, size.y - 32), my_name, HORIZONTAL_ALIGNMENT_CENTER, 90, 11, my_color)
+
+		# ⚡ Barra de energia (só time do jogador — a IA não tem stamina)
+		if not my_is_ejected:
+			_draw_stamina_bar(Vector2(px, size.y - 20), GameState.get_stamina(roster_idx), font)
 
 		if i == active_column and not my_is_ejected and not opp_is_ejected:
 			draw_string(
