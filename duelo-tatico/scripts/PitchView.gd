@@ -36,7 +36,6 @@ var ball_rotation := 0.0
 var flash_pos := Vector2.ZERO
 var flash_alpha := 0.0
 
-var _ball_tween: Tween
 var _pulse_tween: Tween
 
 
@@ -44,7 +43,6 @@ func _ready():
 	ACTIVE_GLOW.a = 0.18
 	AI_GLOW.a = 0.16
 
-	GameState.state_changed.connect(_on_state_changed)
 	visual_column = float(_target_column())
 	_start_pulse()
 	set_process(true)
@@ -52,6 +50,16 @@ func _ready():
 
 func _process(delta):
 	ball_rotation += delta * 4.5
+
+	# 🎯 A bola sempre persegue a coluna correta a cada frame, lendo o
+	# estado atual do jogo direto — nada de Tween/sinal aqui. Um Tween
+	# criado e morto repetidamente em trocas de posse encadeadas (ex: o
+	# passe automático de zona desprotegida, seguido do próximo turno)
+	# podia ficar "preso" num alvo antigo; perseguir o alvo todo frame
+	# elimina essa possibilidade por completo.
+	var target = float(_target_column())
+	if not is_equal_approx(target, visual_column):
+		visual_column = move_toward(visual_column, target, delta * 6.0)
 
 	if randf() < 0.04 and flash_alpha <= 0.0:
 		var side = randi() % 2
@@ -70,47 +78,17 @@ func _process(delta):
 # ===========================
 func _target_column() -> int:
 	var ai_has_ball = (GameState.possession == GameState.Possession.AI)
-	
+
 	if ai_has_ball:
-		var active_ai_player = GameState.ai_active_player()
-		
-		for col in range(GameState.ZONES.size()):
-			var my_player = GameState.squad[clampi(col, 0, GameState.squad.size() - 1)]
-			var opp_player = Matchups.opponent_marker_for_player(GameState, my_player)
-			
-			if opp_player.get("name", "") == active_ai_player.get("name", "") and opp_player.get("role", "") == active_ai_player.get("role", ""):
-				return col
-				
-		return clampi(int(GameState.ai_active_idx), 0, 3)
+		# 🎯 squad e opponent_squad seguem sempre a ordem fixa ZAG/VOL/MEI/CA.
+		# Como o pareamento de marcação é CA<->ZAG e MEI<->VOL, a coluna do
+		# seu time que exibe o atacante ativo da IA é sempre "3 - índice do
+		# atacante" — cálculo direto a partir de ai_active_idx, sem precisar
+		# comparar nome/role (que ficava defasado durante trocas de posse
+		# encadeadas, como no passe automático de zona desprotegida).
+		return clampi(3 - int(GameState.ai_active_idx), 0, 3)
 	else:
 		return clampi(int(GameState.active_idx), 0, 3)
-
-
-func _on_state_changed():
-	var target = float(_target_column())
-
-	if is_equal_approx(target, visual_column):
-		queue_redraw()
-		return
-
-	if _ball_tween:
-		_ball_tween.kill()
-
-	_ball_tween = create_tween()
-	_ball_tween.set_trans(Tween.TRANS_BACK)
-	_ball_tween.set_ease(Tween.EASE_OUT)
-
-	_ball_tween.tween_method(
-		_set_visual_column,
-		visual_column,
-		target,
-		0.35
-	)
-
-
-func _set_visual_column(v: float):
-	visual_column = v
-	queue_redraw()
 
 
 func _start_pulse():

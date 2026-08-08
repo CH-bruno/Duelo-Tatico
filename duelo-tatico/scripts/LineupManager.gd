@@ -13,16 +13,16 @@ const POSITION_ROUND_COST = {
 const ACTION_STAMINA = {
 	"PASS": 1.0,
 	"DRI": 1.5,
-	"FEINT": 2.0,
-	"SHO": 2.4,
-	"LONG_SHO": 2.6
+	"FEINT": 1.8,
+	"SHO": 2.0,
+	"LONG_SHO": 2.2
 }
 
 const DEFENSE_STAMINA = {
 	"INTERCEPT": 1.5,
-	"TACKLE": 2.2,
+	"TACKLE": 2.0,
 	"BLOCK": 1.8,
-	"SLIDE": 2.0
+	"SLIDE": 2.2
 }
 
 # Inicializa Stamina
