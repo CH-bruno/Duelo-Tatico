@@ -137,6 +137,54 @@ static func process_gk_halftime_recovery(gs: Node) -> void:
 	gs.set_gk_stamina(current + recovery)
 
 
+# 🔄 Substituição de goleiro no meio da partida — consome uma
+# substituição do time, igual uma troca de linha.
+static func make_gk_substitution(gs: Node, new_gk_idx: int) -> bool:
+	if gs.substitutions_left <= 0:
+		gs.push_log("⚠️ Não há mais substituições disponíveis!")
+		return false
+
+	var old_gk_idx = gs.starting_gk
+	if old_gk_idx == new_gk_idx:
+		return false
+
+	gs.starting_gk = new_gk_idx
+	gs.substitutions_left -= 1
+
+	# 🚫 O goleiro substituído não pode mais voltar nesta partida
+	if not (old_gk_idx in gs.gk_subbed_out_players):
+		gs.gk_subbed_out_players.append(old_gk_idx)
+
+	# Registra que o novo goleiro jogou (pra fadiga pós-partida)
+	if not (new_gk_idx in gs.gk_who_played):
+		gs.gk_who_played.append(new_gk_idx)
+
+	var old_gk = RosterData.GOALKEEPERS[old_gk_idx]
+	var new_gk = RosterData.GOALKEEPERS[new_gk_idx]
+
+	gs.push_log("🔄 Substituição: Entra %s (GOL) no lugar de %s." % [
+		new_gk.get("name", ""), old_gk.get("name", "")
+	])
+
+	gs.state_changed.emit()
+	return true
+
+
+# Lista de goleiros reservas disponíveis (exclui o titular e quem já saiu)
+static func available_gk_bench(gs: Node) -> Array[int]:
+	var all_candidates = RosterData.candidates_for_gk()
+	var available: Array[int] = []
+
+	for cand_idx in all_candidates:
+		if cand_idx == gs.starting_gk:
+			continue
+		if cand_idx in gs.gk_subbed_out_players:
+			continue
+		available.append(cand_idx)
+
+	return available
+
+
 # Executa a substituição validando limites e disponibilidade
 static func make_substitution(gs: Node, role_idx: int, new_roster_idx: int) -> bool:
 	if gs.substitutions_left <= 0:

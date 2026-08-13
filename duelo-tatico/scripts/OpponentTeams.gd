@@ -4,6 +4,7 @@ extends RefCounted
 const TEAMS = [
 	{
 		"name": "Time de Bairro",
+		"goalkeeper": {"name": "Zezinho", "role": "GOL"},
 		"squad": [
 			{"name":"Marquinho","role":"ZAG","PAS":48,"DRI":42,"SHO":36,"INT":60,"TAC":62,"BLQ":64},
 			{"name":"Bino","role":"VOL","PAS":56,"DRI":52,"SHO":40,"INT":60,"TAC":60,"BLQ":52},
@@ -13,6 +14,7 @@ const TEAMS = [
 	},
 	{
 		"name":"Time Regional",
+		"goalkeeper": {"name": "PC", "role": "GOL"},
 		"squad":[
 			{"name":"Cardoso","role":"ZAG","PAS":56,"DRI":48,"SHO":42,"INT":68,"TAC":70,"BLQ":72},
 			{"name":"Renatinho","role":"VOL","PAS":62,"DRI":58,"SHO":48,"INT":66,"TAC":68,"BLQ":60},
@@ -22,6 +24,7 @@ const TEAMS = [
 	},
 	{
 		"name":"Time Estadual",
+		"goalkeeper": {"name": "Marcelinho", "role": "GOL"},
 		"squad":[
 			{"name":"Bruno Reis","role":"ZAG","PAS":62,"DRI":56,"SHO":48,"INT":76,"TAC":78,"BLQ":80},
 			{"name":"Kadu","role":"VOL","PAS":70,"DRI":66,"SHO":56,"INT":74,"TAC":74,"BLQ":66},
@@ -31,6 +34,7 @@ const TEAMS = [
 	},
 	{
 		"name":"Time Nacional",
+		"goalkeeper": {"name": "Weverton", "role": "GOL"},
 		"squad":[
 			{"name":"Wanderley","role":"ZAG","PAS":70,"DRI":62,"SHO":54,"INT":84,"TAC":86,"BLQ":88},
 			{"name":"Cassiano","role":"VOL","PAS":76,"DRI":72,"SHO":62,"INT":82,"TAC":82,"BLQ":74},
@@ -40,6 +44,7 @@ const TEAMS = [
 	},
 	{
 		"name":"Grande Final",
+		"goalkeeper": {"name": "Muralha", "role": "GOL"},
 		"squad":[
 			{"name":"Aço","role":"ZAG","PAS":76,"DRI":68,"SHO":60,"INT":92,"TAC":92,"BLQ":92},
 			{"name":"Furacão","role":"VOL","PAS":84,"DRI":80,"SHO":72,"INT":88,"TAC":88,"BLQ":82},
@@ -75,6 +80,13 @@ static func team_for_challenge(wins: int) -> Dictionary:
 	return base_team
 
 
+# 🧤 Nome do goleiro do time adversário atual — atributos continuam sendo
+# calculados pela dificuldade (MatchEngine.ai_goalkeeper_stat), isso aqui
+# é só pra dar cara própria à narração das defesas dele.
+static func goalkeeper_name_for(gs: Node) -> String:
+	return gs.current_opponent_team().get("goalkeeper", {}).get("name", "o goleiro")
+
+
 # 🔄 Constrói (uma vez por partida) o squad ativo do adversário: parte
 # sempre dos dados originais (via current_opponent_team(), já duplicados)
 # e aplica cartão/expulsão a partir de ai_players_out / ai_yellow_cards no
@@ -82,11 +94,9 @@ static func team_for_challenge(wins: int) -> Dictionary:
 static func build_active_squad(gs: Node) -> Array:
 	var raw_squad: Array = gs.current_opponent_team().get("squad", [])
 	var final_squad: Array = []
-
 	for i in range(raw_squad.size()):
 		var p = raw_squad[i]
 		p["is_ejected"] = i in gs.ai_players_out
 		p["has_yellow"] = gs.ai_yellow_cards.get(i, false)
 		final_squad.append(p)
-
 	return final_squad

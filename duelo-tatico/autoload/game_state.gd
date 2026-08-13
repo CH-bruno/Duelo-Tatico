@@ -166,6 +166,12 @@ func set_goalkeeper(gk_idx: int) -> void:
 		starting_gk = gk_idx
 		state_changed.emit()
 
+# 🔄 Troca de goleiro DE VERDADE, no meio da partida — consome uma
+# substituição do time (mesma cota compartilhada com os jogadores de
+# linha), diferente de set_goalkeeper() que é a escolha livre pré-partida.
+func substitute_goalkeeper(new_gk_idx: int) -> bool:
+	return LineupManager.make_gk_substitution(self, new_gk_idx)
+
 # 🧤 Retorna o goleiro titular com os atributos já ajustados pela energia
 # atual — mesma curva suave usada pros jogadores de linha (100% -> 1.0x,
 # 50% -> 0.85x, 0% -> 0.70x)
@@ -183,6 +189,7 @@ func reset_substitutions() -> void:
 	players_out.clear()
 	yellow_cards.clear()
 	subbed_out_players.clear()
+	gk_subbed_out_players.clear()
 	players_who_played.clear()
 	
 	# 🧹 Limpa os cartões, W.O. e expulsões da IA

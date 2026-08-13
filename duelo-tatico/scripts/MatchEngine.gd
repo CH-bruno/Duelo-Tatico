@@ -49,7 +49,7 @@ static func _do_shot(gs: Node) -> void:
 		if gk_saved:
 			Stats.shot_on_target()
 			gs.grant_xp(4)
-			gs.push_log(gk_save_narration(save_chance) % ["o goleiro"])
+			gs.push_log(gk_save_narration(save_chance) % [gs.current_opponent_team().get("goalkeeper", {}).get("name", "o goleiro")])
 			SFX.play_defense_fail()
 		else:
 			Stats.shot_on_target()
@@ -89,7 +89,7 @@ static func _do_long_shot(gs: Node) -> void:
 		if gk_saved:
 			Stats.long_shot_on_target()
 			gs.grant_xp(5)
-			gs.push_log(gk_save_narration(save_chance) % ["o goleiro"])
+			gs.push_log(gk_save_narration(save_chance) % [gs.current_opponent_team().get("goalkeeper", {}).get("name", "o goleiro")])
 			SFX.play_defense_fail()
 		else:
 			Stats.long_shot_on_target()

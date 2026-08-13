@@ -201,7 +201,7 @@ func _draw_goalkeeper(pos: Vector2, is_player: bool, font: Font) -> void:
 	if is_player:
 		name_str = GameState.active_goalkeeper().get("name", "")
 	else:
-		name_str = "Goleiro"
+		name_str = GameState.current_opponent_team().get("goalkeeper", {}).get("name", "Goleiro")
 
 	draw_string(font, pos + Vector2(-30, -22), label, HORIZONTAL_ALIGNMENT_CENTER, 60, 11, AppTheme.TEXT_COLOR)
 	draw_string(font, pos + Vector2(-30, -9), name_str, HORIZONTAL_ALIGNMENT_CENTER, 60, 10, AppTheme.TEXT_COLOR)
