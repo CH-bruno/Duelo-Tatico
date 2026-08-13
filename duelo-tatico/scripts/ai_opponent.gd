@@ -124,19 +124,32 @@ static func resolve_shot(bonus: int = 0) -> void:
 	var attack = attack_strength() + GameState.ai_momentum
 	var defender_dict = GameState.active_defender()
 	var block_value = _stat_for(defender_dict, "BLOCK")
+	var is_long = GameState.ai_next_move == GameState.AIMove.LONG_SHOT
 
 	var diff = attack - block_value
-	var chance = clampi(int(round(50 + diff * 0.6)) + bonus, 8, 92)
+	var block_chance = clampi(int(round(50 + diff * 0.6)) + bonus, 8, 92)
 
-	if randi_range(1, 100) <= chance:
-		GameState.ai_goals += 1
-		var scorer = GameState.ai_active_player()
-		GameState.push_log(Narration.GOAL_CALL.pick_random())
-		GameState.push_log(_format_narration(Narration.GOAL.pick_random(), [scorer.get("name", "Jogador"), scorer.get("role", "")]))
-		SFX.play_goal()
-	else:
+	# 🛡️ CAMADA 1: o marcador tenta bloquear o chute
+	if randi_range(1, 100) > block_chance:
 		GameState.grant_xp(3)
-		GameState.push_log("Seu goleiro fez a defesa!")
+		GameState.push_log(_format_narration(Narration.BLOCK_SUCCESS.pick_random(), [defender_dict.get("name", "Jogador"), defender_dict.get("role", "DEF")]))
+	else:
+		# 🥅 CAMADA 2: passou da marcação — agora é o SEU goleiro
+		var save_chance = MatchEngine.goalkeeper_save_chance(GameState, false, is_long)
+		var gk_saved = randi_range(1, 100) <= save_chance
+		var gk = GameState.active_goalkeeper()
+
+		GameState.consume_gk_action_stamina("SAVE_LONG" if is_long else "SAVE", gk_saved)
+
+		if gk_saved:
+			GameState.grant_xp(4)
+			GameState.push_log(_format_narration(MatchEngine.gk_save_narration(save_chance), [gk.get("name", "Goleiro")]))
+		else:
+			GameState.ai_goals += 1
+			var scorer = GameState.ai_active_player()
+			GameState.push_log(Narration.GOAL_CALL.pick_random())
+			GameState.push_log(_format_narration(Narration.GOAL.pick_random(), [scorer.get("name", "Jogador"), scorer.get("role", "")]))
+			SFX.play_goal()
 
 	MatchEngine.kickoff(GameState, true)
 	GameState.ai_momentum = 0

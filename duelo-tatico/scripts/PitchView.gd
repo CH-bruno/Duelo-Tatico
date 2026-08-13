@@ -139,23 +139,23 @@ func _draw_crowd(h: float):
 # ===========================
 #            DRAW
 # ===========================
-func _draw_player(pos: Vector2, color: Color, border: Color, is_ejected: bool = false, has_yellow: bool = false):
+func _draw_player(pos: Vector2, color: Color, border: Color, is_ejected: bool = false, has_yellow: bool = false, radius: float = 8.0):
 	if is_ejected:
 		# Cartão Vermelho (Jogador Indisponível/Escurecido)
-		draw_circle(pos + Vector2(2, 3), 11, Color(0, 0, 0, 0.15))
-		draw_circle(pos, 10, EJECTED_BORDER)
-		draw_circle(pos, 8, EJECTED_COLOR)
+		draw_circle(pos + Vector2(2, 3), radius + 3, Color(0, 0, 0, 0.15))
+		draw_circle(pos, radius + 2, EJECTED_BORDER)
+		draw_circle(pos, radius, EJECTED_COLOR)
 		# Desenha Cartão Vermelho Visual ao lado da peça
-		draw_rect(Rect2(pos.x + 8, pos.y - 10, 6, 9), Color(0.9, 0.1, 0.1))
+		draw_rect(Rect2(pos.x + radius, pos.y - 10, 6, 9), Color(0.9, 0.1, 0.1))
 	else:
-		draw_circle(pos + Vector2(2, 3), 11, Color(0, 0, 0, 0.25))
-		draw_circle(pos, 10, border)
-		draw_circle(pos, 8, color)
+		draw_circle(pos + Vector2(2, 3), radius + 3, Color(0, 0, 0, 0.25))
+		draw_circle(pos, radius + 2, border)
+		draw_circle(pos, radius, color)
 		draw_circle(pos + Vector2(-2, -2), 2.2, Color.WHITE)
 
 		# 🟨 Desenha Cartão Amarelo Visual ao lado da peça (se estiver amarelado)
 		if has_yellow:
-			draw_rect(Rect2(pos.x + 8, pos.y - 10, 6, 9), Color(0.95, 0.8, 0.1))
+			draw_rect(Rect2(pos.x + radius, pos.y - 10, 6, 9), Color(0.95, 0.8, 0.1))
 
 
 func _draw_ball(pos: Vector2):
@@ -187,6 +187,28 @@ func _draw_stamina_bar(center_bottom: Vector2, stamina: float, font: Font) -> vo
 	# 🔋 Ícone de energia — mesmo padrão usado na tela de Escalação
 	var energy_icon = "🔋" if stamina >= 75.0 else ("🪫" if stamina >= 50.0 else "⚠️")
 	draw_string(font, top_left + Vector2(bar_w + 4, bar_h + 1), energy_icon, HORIZONTAL_ALIGNMENT_LEFT, 20, 12)
+
+
+# 🧤 Goleiro — desenhado perto da própria meta (esquerda = seu, direita = da IA)
+func _draw_goalkeeper(pos: Vector2, is_player: bool, font: Font) -> void:
+	var color = PLAYER_COLOR if is_player else ENEMY_COLOR
+	var border = PLAYER_BORDER if is_player else ENEMY_BORDER
+
+	_draw_player(pos, color, border, false, false, 9.0)
+
+	var label = "GOL"
+	var name_str = ""
+	if is_player:
+		name_str = GameState.active_goalkeeper().get("name", "")
+	else:
+		name_str = "Goleiro"
+
+	draw_string(font, pos + Vector2(-30, -22), label, HORIZONTAL_ALIGNMENT_CENTER, 60, 11, AppTheme.TEXT_COLOR)
+	draw_string(font, pos + Vector2(-30, -9), name_str, HORIZONTAL_ALIGNMENT_CENTER, 60, 10, AppTheme.TEXT_COLOR)
+
+	# Só o SEU goleiro tem energia rastreada — a IA não tem stamina própria
+	if is_player:
+		_draw_stamina_bar(pos + Vector2(0, 24), GameState.get_gk_stamina(), font)
 
 
 func _draw():
@@ -280,6 +302,11 @@ func _draw():
 	# ===== 7. GOLS =====
 	draw_rect(Rect2(field_margin - 8, mid_y - 36, 8, 72), Color(0.92, 0.92, 0.92))
 	draw_rect(Rect2(size.x - field_margin, mid_y - 36, 8, 72), Color(0.92, 0.92, 0.92))
+
+	# ===== 7B. GOLEIROS — na faixa central, perto de cada meta =====
+	# Esquerda = seu goleiro (sua meta) / Direita = goleiro da IA (meta deles)
+	_draw_goalkeeper(Vector2(field_margin + 22, mid_y), true, font)
+	_draw_goalkeeper(Vector2(size.x - field_margin - 22, mid_y), false, font)
 
 	# ===== 8. JOGADORES (ALINHAMENTO POR DUELO MATCHUP) =====
 	var ai_has_ball = (GameState.possession == GameState.Possession.AI)

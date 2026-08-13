@@ -42,6 +42,15 @@ var players_out: Array = []
 var players_who_played: Array = []
 var subbed_out_players: Array = []
 
+# ---------- 2B. GOLEIRO ----------
+# Fora da linha de 4 — escalação e energia próprias.
+var starting_gk: int = 0
+var gk_stamina: Dictionary = {}
+var gk_who_played: Array = []
+# 🚫 Goleiros que já saíram por substituição nesta partida — mesma regra
+# dos jogadores de linha, não podem voltar até a próxima partida.
+var gk_subbed_out_players: Array = []
+
 # ---------- 3. POSSE & TURNO ----------
 var possession: Possession = Possession.PLAYER
 var turn_state: TurnState = TurnState.PLAYER_ATTACK
@@ -71,6 +80,7 @@ var log_messages: Array = []
 
 func _ready() -> void:
 	init_stamina()
+	init_gk_stamina()
 	_apply_lineup()
 	_apply_opponent_lineup()
 
@@ -101,6 +111,9 @@ func reset_match_stats() -> void:
 		if not (roster_idx in players_who_played):
 			players_who_played.append(roster_idx)
 
+	# 🧤 Só um goleiro joga por partida (sem rodízio no meio do jogo)
+	gk_who_played = [starting_gk]
+
 func match_stats() -> Dictionary:
 	return Stats.to_dict()
 
@@ -126,6 +139,44 @@ func set_stamina(roster_idx: int, amount: float) -> void:
 	
 func reset_all_stamina() -> void:
 	LineupManager.reset_all_stamina(player_stamina)
+
+# ---------- Goleiro ----------
+func init_gk_stamina() -> void:
+	LineupManager.init_gk_stamina(gk_stamina)
+
+func get_gk_stamina() -> float:
+	return gk_stamina.get(starting_gk, 100.0)
+
+func set_gk_stamina(amount: float) -> void:
+	gk_stamina[starting_gk] = clampf(amount, 0.0, 100.0)
+
+func reset_all_gk_stamina() -> void:
+	LineupManager.reset_all_gk_stamina(gk_stamina)
+
+# 💤 Mesma regra da energia dos jogadores de linha: quem jogou mantém a
+# energia congelada, quem ficou como reserva recupera 100%
+func apply_gk_match_fatigue() -> void:
+	LineupManager.apply_gk_fatigue(gk_stamina, gk_who_played)
+
+func consume_gk_action_stamina(action: String, success: bool) -> void:
+	LineupManager.consume_gk_action_stamina(self, action, success)
+
+func set_goalkeeper(gk_idx: int) -> void:
+	if gk_idx >= 0 and gk_idx < RosterData.GOALKEEPERS.size():
+		starting_gk = gk_idx
+		state_changed.emit()
+
+# 🧤 Retorna o goleiro titular com os atributos já ajustados pela energia
+# atual — mesma curva suave usada pros jogadores de linha (100% -> 1.0x,
+# 50% -> 0.85x, 0% -> 0.70x)
+func active_goalkeeper() -> Dictionary:
+	var raw = RosterData.GOALKEEPERS[starting_gk].duplicate()
+	var stamina = get_gk_stamina()
+	var st_mult = 0.70 + (0.30 * (stamina / 100.0))
+	raw["REF"] = min(95, int(round(raw["REF"] * st_mult)))
+	raw["POS"] = min(95, int(round(raw["POS"] * st_mult)))
+	raw["DEF"] = min(95, int(round(raw["DEF"] * st_mult)))
+	return raw
 
 func reset_substitutions() -> void:
 	substitutions_left = 2

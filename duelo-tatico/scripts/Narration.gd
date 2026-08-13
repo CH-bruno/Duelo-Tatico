@@ -63,6 +63,26 @@ const GOAL_FAIL = [
 ]
 
 # ==============================================================================
+# 1B. GOLEIRO (Camada 2 — depois que o chute supera a marcação)
+# ==============================================================================
+
+const GK_SAVE = [
+	"🧤 Defesa segura do goleiro %s!",
+	"🧤 %s espalma para escanteio!",
+	"🧤 Na trave! %s evita o gol certo!",
+	"🧤 %s se estica todo e faz a defesa!",
+	"🧤 %s desvia com a ponta dos dedos!",
+	"🧤 Grande intervenção de %s!"
+]
+
+const GK_MIRACLE_SAVE = [
+	"🧤🔥 DEFESA IMPOSSÍVEL! %s faz um milagre!",
+	"🧤🔥 QUE DEFESA! %s tira uma bola incrível de cima da linha!",
+	"🧤🔥 Ninguém acreditava, mas %s salvou o time sozinho!",
+	"🧤🔥 ABSURDO! %s voou no ângulo e tirou o gol certo!"
+]
+
+# ==============================================================================
 # 2. DEFESA (Usada para desarmes do jogador e da IA)
 # ==============================================================================
 

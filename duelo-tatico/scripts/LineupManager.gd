@@ -90,6 +90,53 @@ static func process_halftime_recovery(gs: Node) -> void:
 		gs.set_stamina(roster_idx, current + recovery)
 
 
+# ---------- 🧤 GOLEIRO (energia própria, fora do array de 4) ----------
+
+const GK_ACTION_STAMINA = {
+	"SAVE": 2.0,
+	"SAVE_LONG": 2.4
+}
+
+static func init_gk_stamina(gk_stamina: Dictionary) -> void:
+	for i in range(RosterData.GOALKEEPERS.size()):
+		if not gk_stamina.has(i):
+			gk_stamina[i] = 100.0
+
+
+static func reset_all_gk_stamina(gk_stamina: Dictionary) -> void:
+	for i in range(RosterData.GOALKEEPERS.size()):
+		gk_stamina[i] = 100.0
+
+
+static func consume_gk_action_stamina(gs: Node, action: String, _success: bool) -> void:
+	var base_cost = GK_ACTION_STAMINA.get(action, 2.0)
+	var current = gs.get_gk_stamina()
+	gs.set_gk_stamina(current - base_cost)
+
+
+static func apply_gk_fatigue(gk_stamina: Dictionary, gk_who_played: Array) -> void:
+	for i in range(RosterData.GOALKEEPERS.size()):
+		if i in gk_who_played:
+			var current_stamina = gk_stamina.get(i, 100.0)
+			gk_stamina[i] = clampf(current_stamina, 10.0, 100.0)
+		else:
+			gk_stamina[i] = 100.0
+
+
+static func process_gk_halftime_recovery(gs: Node) -> void:
+	var current = gs.get_gk_stamina()
+
+	var recovery = 0.0
+	if current < 60.0:
+		recovery = randf_range(16.0, 22.0)
+	elif current < 80.0:
+		recovery = randf_range(10.0, 15.0)
+	else:
+		recovery = randf_range(5.0, 8.0)
+
+	gs.set_gk_stamina(current + recovery)
+
+
 # Executa a substituição validando limites e disponibilidade
 static func make_substitution(gs: Node, role_idx: int, new_roster_idx: int) -> bool:
 	if gs.substitutions_left <= 0:

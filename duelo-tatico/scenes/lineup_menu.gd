@@ -4,6 +4,8 @@ extends Control
 const AppTheme = preload("res://scripts/AppTheme.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
 
+const GK_SLOT = 4 # 🧤 selected_role_idx == 4 representa o goleiro (fora da linha de 4)
+
 var selected_role_idx: int = 0
 var selected_candidate_idx: int = -1
 
@@ -83,10 +85,41 @@ class PitchView extends Control:
 			draw_rect(bg_bar_rect, Color(0, 0, 0, 0.6))
 			draw_rect(bar_rect, stamina_color)
 
+		# 🧤 GOLEIRO — logo abaixo do ZAG, dentro da própria meta
+		var gk_pos = Vector2(center_x, size.y * 0.955)
+		var gk_selected = (menu.selected_role_idx == menu.GK_SLOT)
+		var gk = GameState.active_goalkeeper()
+		var gk_stamina = GameState.get_gk_stamina()
+
+		var gk_circle_color = AppTheme.GOLD if gk_selected else Color(0.12, 0.20, 0.15)
+		var gk_border_color = AppTheme.GOLD if gk_selected else Color(0.4, 0.55, 0.4)
+
+		if gk_selected:
+			draw_circle(gk_pos, 20, Color(0.85, 0.65, 0.25, 0.3))
+
+		draw_circle(gk_pos, 15, gk_circle_color)
+		draw_arc(gk_pos, 15, 0, TAU, 24, gk_border_color, 2.0)
+
+		var gk_str_size = font.get_string_size("GOL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10)
+		var gk_text_pos = gk_pos + Vector2(-gk_str_size.x / 2.0, font.get_ascent(10) / 2.0 - 1.0)
+		var gk_text_color = AppTheme.BACKGROUND if gk_selected else AppTheme.TEXT_COLOR
+		draw_string(font, gk_text_pos, "GOL", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, gk_text_color)
+
+		draw_string(font, gk_pos + Vector2(-40, -19), gk.get("name", ""), HORIZONTAL_ALIGNMENT_CENTER, 80, 10, AppTheme.TEXT_COLOR)
+
+		var gk_stamina_color = AppTheme.SUCCESS if gk_stamina > 70 else (AppTheme.WARNING if gk_stamina > 35 else AppTheme.DANGER)
+		var gk_bar_w = 40.0
+		var gk_bg_bar_rect = Rect2(gk_pos.x - gk_bar_w / 2.0, gk_pos.y + 18, gk_bar_w, 4)
+		var gk_bar_rect = Rect2(gk_pos.x - gk_bar_w / 2.0, gk_pos.y + 18, gk_bar_w * (gk_stamina / 100.0), 4)
+
+		draw_rect(gk_bg_bar_rect, Color(0, 0, 0, 0.6))
+		draw_rect(gk_bar_rect, gk_stamina_color)
+
 	func _gui_input(event):
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 			var local_y_pct = event.position.y / size.y
-			if local_y_pct > 0.72: menu.selected_role_idx = 0
+			if local_y_pct > 0.90: menu.selected_role_idx = menu.GK_SLOT
+			elif local_y_pct > 0.72: menu.selected_role_idx = 0
 			elif local_y_pct > 0.52: menu.selected_role_idx = 1
 			elif local_y_pct > 0.32: menu.selected_role_idx = 2
 			else: menu.selected_role_idx = 3
@@ -226,16 +259,26 @@ func _update_comparison_cards():
 	for child in comparison_container.get_children():
 		child.queue_free()
 
+	var cards_hbox = HBoxContainer.new()
+	cards_hbox.add_theme_constant_override("separation", 8)
+	cards_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	if selected_role_idx == GK_SLOT:
+		_build_gk_comparison_cards(cards_hbox)
+	else:
+		_build_outfield_comparison_cards(cards_hbox)
+
+	comparison_container.add_child(cards_hbox)
+
+
+func _build_outfield_comparison_cards(cards_hbox: HBoxContainer) -> void:
 	if selected_role_idx < 0 or selected_role_idx >= GameState.squad.size():
 		return
 
 	var starter_roster_idx = GameState.starters[selected_role_idx]
 	var starter = GameState.squad[selected_role_idx]
 	var starter_stamina = GameState.get_stamina(starter_roster_idx)
-
-	var cards_hbox = HBoxContainer.new()
-	cards_hbox.add_theme_constant_override("separation", 8)
-	cards_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var stat_list = ["PAS", "DRI", "SHO", "INT", "TAC", "BLQ"]
 
 	# --- CARD 1: TITULAR ---
 	var card_starter = _create_player_card(
@@ -245,7 +288,8 @@ func _update_comparison_cards():
 		starter_stamina,
 		starter,
 		AppTheme.GOLD,
-		null
+		null,
+		stat_list
 	)
 	card_starter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	cards_hbox.add_child(card_starter)
@@ -276,15 +320,60 @@ func _update_comparison_cards():
 			candidate_stamina,
 			candidate_stats,
 			AppTheme.SUCCESS,
-			starter
+			starter,
+			stat_list
 		)
 		card_candidate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		cards_hbox.add_child(card_candidate)
 
-	comparison_container.add_child(cards_hbox)
+
+func _build_gk_comparison_cards(cards_hbox: HBoxContainer) -> void:
+	var starter = GameState.active_goalkeeper()
+	var starter_stamina = GameState.get_gk_stamina()
+	var stat_list = ["REF", "POS", "DEF"]
+
+	var card_starter = _create_player_card(
+		starter["name"] + " [TITULAR]",
+		"GOL",
+		RosterData.trait_name(starter.get("trait", "")),
+		starter_stamina,
+		starter,
+		AppTheme.GOLD,
+		null,
+		stat_list
+	)
+	card_starter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cards_hbox.add_child(card_starter)
+
+	if selected_candidate_idx != -1:
+		var candidate_raw = RosterData.GOALKEEPERS[selected_candidate_idx]
+		var candidate_stamina = GameState.gk_stamina.get(selected_candidate_idx, 100.0)
+
+		var st_mult = 1.0
+		if candidate_stamina < 50.0: st_mult = 0.80
+		elif candidate_stamina < 75.0: st_mult = 0.90
+
+		var candidate_stats = {
+			"REF": min(95, int(round(candidate_raw["REF"] * st_mult))),
+			"POS": min(95, int(round(candidate_raw["POS"] * st_mult))),
+			"DEF": min(95, int(round(candidate_raw["DEF"] * st_mult)))
+		}
+
+		var card_candidate = _create_player_card(
+			candidate_raw["name"] + " [RESERVA]",
+			"GOL",
+			RosterData.trait_name(candidate_raw.get("trait", "")),
+			candidate_stamina,
+			candidate_stats,
+			AppTheme.SUCCESS,
+			starter,
+			stat_list
+		)
+		card_candidate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		cards_hbox.add_child(card_candidate)
 
 
-func _create_player_card(p_name: String, role: String, trait_str: String, stamina: float, stats: Dictionary, border_color: Color, base_stats) -> PanelContainer:
+func _create_player_card(p_name: String, role: String, trait_str: String, stamina: float, stats: Dictionary, border_color: Color, base_stats, stat_list: Array) -> PanelContainer:
 	var card_style = StyleBoxFlat.new()
 	card_style.bg_color = AppTheme.PANEL
 	card_style.border_color = border_color
@@ -320,8 +409,6 @@ func _create_player_card(p_name: String, role: String, trait_str: String, stamin
 	var grid = GridContainer.new()
 	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	var stat_list = ["PAS", "DRI", "SHO", "INT", "TAC", "BLQ"]
 
 	for code in stat_list:
 		var lbl_code = Label.new()
@@ -359,6 +446,10 @@ func _update_bench_list():
 	for child in bench_container.get_children():
 		child.queue_free()
 
+	if selected_role_idx == GK_SLOT:
+		_update_gk_bench_list()
+		return
+
 	var candidates = RosterData.candidates_for(selected_role_idx)
 	var current_starter_roster_idx = GameState.starters[selected_role_idx]
 
@@ -380,16 +471,46 @@ func _update_bench_list():
 		bench_container.add_child(btn)
 
 
+func _update_gk_bench_list() -> void:
+	var candidates = RosterData.candidates_for_gk()
+
+	for c_idx in candidates:
+		var c_data = RosterData.GOALKEEPERS[c_idx]
+		var c_stamina = GameState.gk_stamina.get(c_idx, 100.0)
+		var is_current_starter = (c_idx == GameState.starting_gk)
+
+		var btn = Button.new()
+		btn.text = "%s (%d%% ⚡) %s" % [c_data["name"], int(c_stamina), "[TITULAR]" if is_current_starter else ""]
+		btn.custom_minimum_size = Vector2(0, 28)
+
+		if is_current_starter:
+			btn.disabled = true
+		else:
+			btn.pressed.connect(func(): _select_candidate(c_idx))
+
+		UIUtils.add_press_feedback(btn)
+		bench_container.add_child(btn)
+
+
 func _select_candidate(roster_idx: int):
 	selected_candidate_idx = roster_idx
 	swap_button.disabled = false
-	swap_button.text = "Escalar %s" % RosterData.ROSTER[roster_idx]["name"]
+
+	if selected_role_idx == GK_SLOT:
+		swap_button.text = "Escalar %s" % RosterData.GOALKEEPERS[roster_idx]["name"]
+	else:
+		swap_button.text = "Escalar %s" % RosterData.ROSTER[roster_idx]["name"]
+
 	_refresh_ui()
 
 
 func _on_swap_pressed():
 	if selected_candidate_idx != -1:
-		GameState.set_starter(selected_role_idx, selected_candidate_idx)
+		if selected_role_idx == GK_SLOT:
+			GameState.set_goalkeeper(selected_candidate_idx)
+		else:
+			GameState.set_starter(selected_role_idx, selected_candidate_idx)
+
 		selected_candidate_idx = -1
 		swap_button.disabled = true
 		swap_button.text = "Selecione um reserva para comparar"

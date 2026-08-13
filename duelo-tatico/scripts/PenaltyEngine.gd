@@ -13,13 +13,26 @@ static func execute_penalty(gs: Node, is_player_kicker: bool) -> void:
 
 	var k_name = kicker_dict.get("name", "Jogador")
 	var k_role = kicker_dict.get("role", "")
-
 	var sho_stat = float(kicker_dict.get("SHO", 50))
 	var trait_bonus = float(RosterData.trait_bonus(kicker_dict, "SHO"))
-	
-	# Chance de converter o pênalti (Base 75% + atributos do cobrador)
-	var convert_chance = clampi(int(round(75 + (sho_stat - 50) * 0.4 + trait_bonus)), 50, 95)
+
+	# 🥅 Goleiro que está defendendo a cobrança
+	var gk_stat := 50.0
+	if is_player_kicker:
+		# Você cobra: quem defende é o goleiro da IA (escalado pela dificuldade)
+		gk_stat = MatchEngine.ai_goalkeeper_stat(gs, false)
+	else:
+		# A IA cobra: quem defende é o SEU goleiro titular
+		var gk = gs.active_goalkeeper()
+		gk_stat = gk.get("REF", 50) * 0.6 + gk.get("POS", 50) * 0.4
+
+	# Chance de converter: base 75% + atributos do cobrador, reduzida pelo goleiro
+	var convert_chance = clampi(int(round(75 + (sho_stat - 50) * 0.4 + trait_bonus - (gk_stat - 50) * 0.5)), 40, 95)
 	var success = randi_range(1, 100) <= convert_chance
+
+	# 🧤 Consome energia do SEU goleiro sempre que ele é quem está defendendo
+	if not is_player_kicker:
+		gs.consume_gk_action_stamina("SAVE", not success)
 
 	if success:
 		if is_player_kicker:
@@ -33,12 +46,12 @@ static func execute_penalty(gs: Node, is_player_kicker: bool) -> void:
 		gs.push_log(AIOpponent._format_narration(Narration.PENALTY_GOAL.pick_random(), [k_name, k_role]))
 		SFX.play_goal()
 	else:
-		# 🎯 Log de pênalti perdido
-		# Se você tiver a constante PENALTY_MISSED no seu Narration.gd ela será usada, senão usa a frase padrão
-		if "PENALTY_MISSED" in Narration:
-			gs.push_log(AIOpponent._format_narration(Narration.PENALTY_FAIL.pick_random(), [k_name, k_role]))
+		# 🎯 Log de pênalti perdido/defendido
+		if not is_player_kicker:
+			var gk = gs.active_goalkeeper()
+			gs.push_log(AIOpponent._format_narration(MatchEngine.gk_save_narration(100 - convert_chance), [gk.get("name", "o goleiro")]))
 		else:
-			gs.push_log("❌ PERDEU O PÊNALTI! O chute de %s (%s) foi para fora ou defendido!" % [k_name, k_role])
+			gs.push_log(AIOpponent._format_narration(Narration.PENALTY_FAIL.pick_random(), [k_name, k_role]))
 			
 		SFX.play_defense_fail()
 

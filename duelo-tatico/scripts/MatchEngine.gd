@@ -31,23 +31,34 @@ static func _do_shot(gs: Node) -> void:
 	
 	gs.push_log("%s (%s) encheu o pé e finalizou para o gol!" % [passer.get("name", "Jogador"), passer.get("role", "")])
 	
+	# 🛡️ CAMADA 1: precisa superar a marcação
 	var succ_chance = chance_for(gs, "SHO")
 	var success = randi_range(1, 100) <= succ_chance
 
 	gs.consume_action_stamina(active_roster_idx, "SHO", success)
 
-	if success:
-		Stats.shot_on_target()
-		gs.goals += 1
-		gs.streak += 1
-		gs.grant_xp(15)
-		gs.push_log(Narration.GOAL_CALL.pick_random())
-		gs.push_log(Narration.GOAL.pick_random() % [passer["name"], passer["role"]])
-		SFX.play_goal()
-	else:
+	if not success:
 		gs.grant_xp(2)
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		gs.push_log(Narration.BLOCK_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+	else:
+		# 🥅 CAMADA 2: superou a marcação — agora é o goleiro da IA
+		var save_chance = goalkeeper_save_chance(gs, true, false)
+		var gk_saved = randi_range(1, 100) <= save_chance
+
+		if gk_saved:
+			Stats.shot_on_target()
+			gs.grant_xp(4)
+			gs.push_log(gk_save_narration(save_chance) % ["o goleiro"])
+			SFX.play_defense_fail()
+		else:
+			Stats.shot_on_target()
+			gs.goals += 1
+			gs.streak += 1
+			gs.grant_xp(15)
+			gs.push_log(Narration.GOAL_CALL.pick_random())
+			gs.push_log(Narration.GOAL.pick_random() % [passer["name"], passer["role"]])
+			SFX.play_goal()
 
 	kickoff(gs, false)
 	gs.momentum_bonus = 0
@@ -60,23 +71,34 @@ static func _do_long_shot(gs: Node) -> void:
 	
 	gs.push_log("%s (%s) soltou uma bomba de longe!" % [passer.get("name", "Jogador"), passer.get("role", "")])
 	
+	# 🛡️ CAMADA 1: precisa superar a marcação
 	var succ_chance = long_shot_chance(gs)
 	var success = randi_range(1, 100) <= succ_chance
 
 	gs.consume_action_stamina(active_roster_idx, "LONG_SHO", success)
 
-	if success:
-		Stats.long_shot_on_target()
-		gs.goals += 1
-		gs.streak += 1
-		gs.grant_xp(20)
-		gs.push_log(Narration.GOAL_CALL.pick_random())
-		gs.push_log(Narration.LONG_GOAL.pick_random() % [passer["name"], passer["role"]])
-		SFX.play_goal()
-	else:
+	if not success:
 		gs.grant_xp(2)
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		gs.push_log(Narration.BLOCK_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+	else:
+		# 🥅 CAMADA 2: superou a marcação — agora é o goleiro da IA
+		var save_chance = goalkeeper_save_chance(gs, true, true)
+		var gk_saved = randi_range(1, 100) <= save_chance
+
+		if gk_saved:
+			Stats.long_shot_on_target()
+			gs.grant_xp(5)
+			gs.push_log(gk_save_narration(save_chance) % ["o goleiro"])
+			SFX.play_defense_fail()
+		else:
+			Stats.long_shot_on_target()
+			gs.goals += 1
+			gs.streak += 1
+			gs.grant_xp(20)
+			gs.push_log(Narration.GOAL_CALL.pick_random())
+			gs.push_log(Narration.LONG_GOAL.pick_random() % [passer["name"], passer["role"]])
+			SFX.play_goal()
 
 	kickoff(gs, false)
 	gs.momentum_bonus = 0
@@ -308,6 +330,53 @@ static func pass_chance_to(gs: Node, target_idx: int) -> int:
 	var tb = gs.trait_bonus("PASS")
 	var effective_difficulty = marker.get("INT", 50) + distance_penalty - adjacent_bonus + gs._difficulty_bonus()
 	return Rules.success_chance(gs.active_player().get("PAS", 50), effective_difficulty, momentum_effect, tb)
+
+
+# ==============================================================================
+# 🧤 GOLEIRO (Camada 2 de finalização — só entra depois que o chute supera a marcação)
+# ==============================================================================
+
+# 🥅 O time adversário não tem goleiro nomeado com atributos próprios —
+# é representado por um "nível" que escala com a dificuldade da fase/
+# desafio, no mesmo espírito de attack_strength() pro ataque da IA.
+static func ai_goalkeeper_stat(gs: Node, is_long_shot: bool) -> float:
+	var base = 42.0 + (gs.difficulty_stage() - 1) * 4.0
+	if is_long_shot:
+		base -= 5.0 # goleiro cobre pior chutes de longe do que de perto
+	return clampf(base, 25.0, 85.0)
+
+
+# is_player_shooting: true = você chuta contra o goleiro da IA;
+# false = a IA chuta contra o SEU goleiro titular.
+static func goalkeeper_save_chance(gs: Node, is_player_shooting: bool, is_long_shot: bool) -> int:
+	var shooter = gs.active_player() if is_player_shooting else gs.ai_active_player()
+	var sho_stat = float(shooter.get("SHO", 50))
+
+	var gk_stat: float
+	var tb := 0.0
+
+	if is_player_shooting:
+		gk_stat = ai_goalkeeper_stat(gs, is_long_shot)
+	else:
+		var gk = gs.active_goalkeeper()
+		var save_action = "SAVE_LONG" if is_long_shot else "SAVE"
+		tb = float(RosterData.trait_bonus(gk, save_action))
+
+		# Chute de longe testa mais o Posicionamento; chute de dentro da
+		# área testa mais os Reflexos. Defesa Geral sempre pesa um pouco.
+		if is_long_shot:
+			gk_stat = gk.get("POS", 50) * 0.55 + gk.get("REF", 50) * 0.25 + gk.get("DEF", 50) * 0.20
+		else:
+			gk_stat = gk.get("REF", 50) * 0.55 + gk.get("DEF", 50) * 0.25 + gk.get("POS", 50) * 0.20
+
+	return Rules.success_chance(gk_stat, sho_stat, 0, tb, 8, 88)
+
+
+# Escolhe entre defesa "normal" e "milagre" conforme a chance de defesa era baixa
+static func gk_save_narration(save_chance: int) -> String:
+	if save_chance < 35:
+		return Narration.GK_MIRACLE_SAVE.pick_random()
+	return Narration.GK_SAVE.pick_random()
 
 
 static func kickoff(gs: Node, start_with_player: bool = true) -> void:
