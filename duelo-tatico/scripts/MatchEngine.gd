@@ -42,6 +42,10 @@ static func _do_shot(gs: Node) -> void:
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		gs.push_log(Narration.BLOCK_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
 	else:
+		# ⚠️ A marcação foi superada — antes de ir pro goleiro, credita a falha do marcador
+		var marker = Matchups.opponent_marker_for_player(gs, passer)
+		gs.push_log(Narration.BLOCK_FAIL.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+
 		# 🥅 CAMADA 2: superou a marcação — agora é o goleiro da IA
 		var save_chance = goalkeeper_save_chance(gs, true, false)
 		var gk_saved = randi_range(1, 100) <= save_chance
@@ -56,6 +60,7 @@ static func _do_shot(gs: Node) -> void:
 			gs.goals += 1
 			gs.streak += 1
 			gs.grant_xp(15)
+			gs.push_log(Narration.GK_BEATEN.pick_random() % [gs.current_opponent_team().get("goalkeeper", {}).get("name", "o goleiro")])
 			gs.push_log(Narration.GOAL_CALL.pick_random())
 			gs.push_log(Narration.GOAL.pick_random() % [passer["name"], passer["role"]])
 			SFX.play_goal()
@@ -82,6 +87,10 @@ static func _do_long_shot(gs: Node) -> void:
 		var marker = Matchups.opponent_marker_for_player(gs, passer)
 		gs.push_log(Narration.BLOCK_SUCCESS.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
 	else:
+		# ⚠️ A marcação foi superada — antes de ir pro goleiro, credita a falha do marcador
+		var marker = Matchups.opponent_marker_for_player(gs, passer)
+		gs.push_log(Narration.BLOCK_FAIL.pick_random() % [marker.get("name", "Adversário"), marker.get("role", "DEF")])
+
 		# 🥅 CAMADA 2: superou a marcação — agora é o goleiro da IA
 		var save_chance = goalkeeper_save_chance(gs, true, true)
 		var gk_saved = randi_range(1, 100) <= save_chance
@@ -96,6 +105,7 @@ static func _do_long_shot(gs: Node) -> void:
 			gs.goals += 1
 			gs.streak += 1
 			gs.grant_xp(20)
+			gs.push_log(Narration.GK_BEATEN.pick_random() % [gs.current_opponent_team().get("goalkeeper", {}).get("name", "o goleiro")])
 			gs.push_log(Narration.GOAL_CALL.pick_random())
 			gs.push_log(Narration.LONG_GOAL.pick_random() % [passer["name"], passer["role"]])
 			SFX.play_goal()
@@ -336,38 +346,25 @@ static func pass_chance_to(gs: Node, target_idx: int) -> int:
 # 🧤 GOLEIRO (Camada 2 de finalização — só entra depois que o chute supera a marcação)
 # ==============================================================================
 
-# 🥅 O time adversário não tem goleiro nomeado com atributos próprios —
-# é representado por um "nível" que escala com a dificuldade da fase/
-# desafio, no mesmo espírito de attack_strength() pro ataque da IA.
-static func ai_goalkeeper_stat(gs: Node, is_long_shot: bool) -> float:
-	var base = 42.0 + (gs.difficulty_stage() - 1) * 4.0
-	if is_long_shot:
-		base -= 5.0 # goleiro cobre pior chutes de longe do que de perto
-	return clampf(base, 25.0, 85.0)
-
-
 # is_player_shooting: true = você chuta contra o goleiro da IA;
 # false = a IA chuta contra o SEU goleiro titular.
 static func goalkeeper_save_chance(gs: Node, is_player_shooting: bool, is_long_shot: bool) -> int:
 	var shooter = gs.active_player() if is_player_shooting else gs.ai_active_player()
 	var sho_stat = float(shooter.get("SHO", 50))
 
+	var gk = gs.current_opponent_team().get("goalkeeper", {}) if is_player_shooting else gs.active_goalkeeper()
+	var save_action = "SAVE_LONG" if is_long_shot else "SAVE"
+	var tb = float(RosterData.trait_bonus(gk, save_action))
+
+	# Chute de longe testa mais o Posicionamento; chute de dentro da
+	# área testa mais os Reflexos. Defesa Geral sempre pesa um pouco.
+	# Mesma fórmula pros dois lados — o goleiro da IA agora tem
+	# atributos reais, igual o seu, em vez de uma força genérica.
 	var gk_stat: float
-	var tb := 0.0
-
-	if is_player_shooting:
-		gk_stat = ai_goalkeeper_stat(gs, is_long_shot)
+	if is_long_shot:
+		gk_stat = gk.get("POS", 50) * 0.55 + gk.get("REF", 50) * 0.25 + gk.get("DEF", 50) * 0.20
 	else:
-		var gk = gs.active_goalkeeper()
-		var save_action = "SAVE_LONG" if is_long_shot else "SAVE"
-		tb = float(RosterData.trait_bonus(gk, save_action))
-
-		# Chute de longe testa mais o Posicionamento; chute de dentro da
-		# área testa mais os Reflexos. Defesa Geral sempre pesa um pouco.
-		if is_long_shot:
-			gk_stat = gk.get("POS", 50) * 0.55 + gk.get("REF", 50) * 0.25 + gk.get("DEF", 50) * 0.20
-		else:
-			gk_stat = gk.get("REF", 50) * 0.55 + gk.get("DEF", 50) * 0.25 + gk.get("POS", 50) * 0.20
+		gk_stat = gk.get("REF", 50) * 0.55 + gk.get("DEF", 50) * 0.25 + gk.get("POS", 50) * 0.20
 
 	return Rules.success_chance(gk_stat, sho_stat, 0, tb, 8, 88)
 

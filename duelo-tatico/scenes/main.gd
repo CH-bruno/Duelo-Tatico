@@ -23,9 +23,11 @@ const OptionsMenuScene = preload("res://scenes/OptionsMenu.tscn")
 const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
 const SubstitutionDialogScene = preload("res://scenes/SubstitutionDialog.tscn")
 const HalftimeDialogScript = preload("res://scenes/HalftimeDialog.gd")
+const MatchLogDialogScript = preload("res://scripts/MatchLogDialog.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var sub_button: Button = null
+var log_button: Button = null
 var _last_goals = 0
 var _last_ai_goals = 0
 var stats_opened := false
@@ -70,6 +72,18 @@ func _setup_top_header_buttons() -> void:
 
 	sub_button.text = "🔄 Subs (%d)" % GameState.substitutions_left
 
+	# 📜 Botão de Histórico completo da narração
+	if log_button == null:
+		log_button = Button.new()
+		log_button.name = "LogButton"
+		log_button.theme_type_variation = "GhostButton"
+		log_button.text = "📜 Histórico"
+		log_button.custom_minimum_size = Vector2(100, 30)
+		log_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+
+		header.add_child(log_button)
+		header.move_child(log_button, options_button.get_index())
+
 
 func _init_submodules() -> void:
 	match_anims = MatchAnimations.new()
@@ -102,6 +116,8 @@ func _init_submodules() -> void:
 	]
 	if sub_button:
 		all_buttons.append(sub_button)
+	if log_button:
+		all_buttons.append(log_button)
 
 	for btn in all_buttons:
 		if btn:
@@ -124,6 +140,9 @@ func _connect_signals() -> void:
 	if sub_button:
 		# ✅ Conexão segura via lambda para evitar inconsistências de parâmetros
 		sub_button.pressed.connect(func(): _open_substitutions_dialog(false))
+
+	if log_button:
+		log_button.pressed.connect(_open_log_dialog)
 
 	intercept_button.pressed.connect(func(): GameState.defend("INTERCEPT"))
 	tackle_button.pressed.connect(func(): GameState.defend("TACKLE"))
@@ -194,6 +213,23 @@ func _open_substitutions_dialog(is_halftime: bool = false) -> void:
 		if is_halftime or (GameState.round_num == int(GameState.MAX_ROUNDS / 2.0) and not GameState.first_half):
 			MatchFlow.start_second_half(GameState)
 		refresh_ui()
+	)
+
+
+# 📜 Abre o modal com o histórico completo da narração da partida.
+# Não precisa de .tscn própria — mesmo padrão do HalftimeDialog, script
+# anexado direto num Control novo.
+func _open_log_dialog() -> void:
+	if has_node("MatchLogDialog"):
+		return
+
+	var dialog = Control.new()
+	dialog.name = "MatchLogDialog"
+	dialog.set_script(MatchLogDialogScript)
+	add_child(dialog)
+
+	dialog.closed.connect(func():
+		pass
 	)
 
 

@@ -121,7 +121,18 @@ func _squad_summary_formatted() -> String:
 	var lines = []
 	lines.append("📋 TITULARES ESCALADOS (Nível do Time: %d)" % GameState.level)
 	lines.append("")
-	
+
+	# 🧤 Goleiro primeiro — fora da linha de 4, mostrado com REF/POS/DEF em vez de ATQ/DEF
+	var gk = GameState.active_goalkeeper()
+	var gk_stamina = GameState.get_gk_stamina()
+	var gk_energy_icon = "🔋" if gk_stamina >= 75.0 else ("🪫" if gk_stamina >= 50.0 else "⚠️")
+	var gk_trait_str = GameState.trait_name(gk.get("trait", ""))
+
+	lines.append("• [GOL] %s %s (%d%%)   │   %s   │   REF %d   │   POS %d   │   DEF %d" % [
+		gk.get("name", "Goleiro"), gk_energy_icon, int(gk_stamina),
+		gk_trait_str, gk.get("REF", 0), gk.get("POS", 0), gk.get("DEF", 0)
+	])
+
 	for i in range(GameState.squad.size()):
 		var p = GameState.squad[i]
 		var roster_idx = GameState.starters[i]
@@ -134,17 +145,6 @@ func _squad_summary_formatted() -> String:
 			p["PAS"], p["DRI"], p["SHO"],
 			p["INT"], p["TAC"], p["BLQ"]
 		])
-
-	# 🧤 Goleiro — fora da linha de 4, mostrado com REF/POS/DEF em vez de ATQ/DEF
-	var gk = GameState.active_goalkeeper()
-	var gk_stamina = GameState.get_gk_stamina()
-	var gk_energy_icon = "🔋" if gk_stamina >= 75.0 else ("🪫" if gk_stamina >= 50.0 else "⚠️")
-	var gk_trait_str = GameState.trait_name(gk.get("trait", ""))
-
-	lines.append("• [GOL] %s %s (%d%%)   │   %s   │   REF %d   │   POS %d   │   DEF %d" % [
-		gk.get("name", "Goleiro"), gk_energy_icon, int(gk_stamina),
-		gk_trait_str, gk.get("REF", 0), gk.get("POS", 0), gk.get("DEF", 0)
-	])
 		
 	return "\n".join(lines)
 

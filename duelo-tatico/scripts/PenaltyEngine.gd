@@ -19,8 +19,9 @@ static func execute_penalty(gs: Node, is_player_kicker: bool) -> void:
 	# 🥅 Goleiro que está defendendo a cobrança
 	var gk_stat := 50.0
 	if is_player_kicker:
-		# Você cobra: quem defende é o goleiro da IA (escalado pela dificuldade)
-		gk_stat = MatchEngine.ai_goalkeeper_stat(gs, false)
+		# Você cobra: quem defende é o goleiro do time adversário (atributos reais)
+		var ai_gk = gs.current_opponent_team().get("goalkeeper", {})
+		gk_stat = ai_gk.get("REF", 50) * 0.6 + ai_gk.get("POS", 50) * 0.4
 	else:
 		# A IA cobra: quem defende é o SEU goleiro titular
 		var gk = gs.active_goalkeeper()

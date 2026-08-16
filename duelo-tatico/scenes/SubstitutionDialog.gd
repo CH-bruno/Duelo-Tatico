@@ -362,11 +362,9 @@ func _do_substitute_outfield(role_idx: int, new_roster_idx: int) -> void:
 	if GameState.substitutions_left <= 0:
 		return
 
-	var old_player_name = GameState.squad[role_idx]["name"]
+	# 📝 Não loga aqui — GameState.substitute() -> LineupManager.make_substitution()
+	# já registra a substituição (com o cargo incluso), logar de novo aqui duplicava a linha.
 	GameState.substitute(role_idx, new_roster_idx)
-	var new_player_name = GameState.squad[role_idx]["name"]
-
-	GameState.push_log("🔄 Substituição: Entra %s no lugar de %s!" % [new_player_name, old_player_name])
 	_refresh_ui()
 
 

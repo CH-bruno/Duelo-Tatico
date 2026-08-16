@@ -134,6 +134,9 @@ static func resolve_shot(bonus: int = 0) -> void:
 		GameState.grant_xp(3)
 		GameState.push_log(_format_narration(Narration.BLOCK_SUCCESS.pick_random(), [defender_dict.get("name", "Jogador"), defender_dict.get("role", "DEF")]))
 	else:
+		# ⚠️ Seu marcador foi superado — credita a falha antes de ir pro goleiro
+		GameState.push_log(_format_narration(Narration.BLOCK_FAIL.pick_random(), [defender_dict.get("name", "Jogador"), defender_dict.get("role", "DEF")]))
+
 		# 🥅 CAMADA 2: passou da marcação — agora é o SEU goleiro
 		var save_chance = MatchEngine.goalkeeper_save_chance(GameState, false, is_long)
 		var gk_saved = randi_range(1, 100) <= save_chance
@@ -147,6 +150,7 @@ static func resolve_shot(bonus: int = 0) -> void:
 		else:
 			GameState.ai_goals += 1
 			var scorer = GameState.ai_active_player()
+			GameState.push_log(_format_narration(Narration.GK_BEATEN.pick_random(), [gk.get("name", "Goleiro")]))
 			GameState.push_log(Narration.GOAL_CALL.pick_random())
 			GameState.push_log(_format_narration(Narration.GOAL.pick_random(), [scorer.get("name", "Jogador"), scorer.get("role", "")]))
 			SFX.play_goal()

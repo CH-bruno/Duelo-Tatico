@@ -82,6 +82,26 @@ const GK_MIRACLE_SAVE = [
 	"🧤🔥 ABSURDO! %s voou no ângulo e tirou o gol certo!"
 ]
 
+# 🛡️ O marcador (zagueiro) NÃO consegue bloquear — o chute passa pra
+# camada do goleiro. Usa nome/role do marcador, igual BLOCK_SUCCESS.
+const BLOCK_FAIL = [
+	"⚠️ %s (%s) não chega a tempo no bloqueio!",
+	"⚠️ %s (%s) fica no caminho errado e o chute passa!",
+	"⚠️ %s (%s) tenta se jogar na frente, mas não alcança!",
+	"⚠️ Marcação furada! %s (%s) não consegue impedir a finalização.",
+	"⚠️ %s (%s) é driblado no lance e vê o chute seguir para o gol!"
+]
+
+# 🥅 O goleiro é vazado — usado logo antes do "GOOOOL!" pra creditar a
+# falha dele especificamente, e não só anunciar o gol do atacante.
+const GK_BEATEN = [
+	"🥅 %s não alcança dessa vez!",
+	"🥅 %s fica no chão e vê a bola morrer no fundo da rede!",
+	"🥅 Sem chances para %s!",
+	"🥅 %s se estica mas não chega!",
+	"🥅 %s é batido no lance!"
+]
+
 # ==============================================================================
 # 2. DEFESA (Usada para desarmes do jogador e da IA)
 # ==============================================================================

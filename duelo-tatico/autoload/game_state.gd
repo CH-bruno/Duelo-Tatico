@@ -374,5 +374,9 @@ func _process_pending_xp() -> void:
 
 func push_log(text: String) -> void:
 	log_messages.push_front(text)
-	if log_messages.size() > 5:
-		log_messages.resize(5)
+	# 📜 Não trunca mais aqui — o log completo da partida fica guardado.
+	# A tela ao vivo (MatchUI) continua mostrando só as 5 mais recentes
+	# via slice(); o histórico completo fica disponível pro modal de
+	# "Ver Histórico". Cap generoso só pra não crescer sem limite.
+	if log_messages.size() > 500:
+		log_messages.resize(500)

@@ -203,6 +203,12 @@ func _draw_goalkeeper(pos: Vector2, is_player: bool, font: Font) -> void:
 	else:
 		name_str = GameState.current_opponent_team().get("goalkeeper", {}).get("name", "Goleiro")
 
+	# 🏷️ Fundo atrás do rótulo/nome — sem isso, as linhas brancas da
+	# grande área/pequena área (bem perto da meta) atrapalhavam a leitura
+	var label_bg = Rect2(pos.x - 38, pos.y - 32, 76, 42)
+	draw_rect(label_bg, Color(0, 0, 0, 0.6))
+	draw_rect(label_bg, Color(1, 1, 1, 0.12), false, 1.0)
+
 	draw_string(font, pos + Vector2(-30, -22), label, HORIZONTAL_ALIGNMENT_CENTER, 60, 11, AppTheme.TEXT_COLOR)
 	draw_string(font, pos + Vector2(-30, -9), name_str, HORIZONTAL_ALIGNMENT_CENTER, 60, 10, AppTheme.TEXT_COLOR)
 
