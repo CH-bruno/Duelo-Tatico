@@ -261,7 +261,7 @@ static func defend(action: String) -> void:
 				GameState.state_changed.emit()
 				return
 
-			PenaltyEngine.execute_penalty(GameState, false)
+			PenaltyEngine.start_penalty(GameState, false)
 			return
 		elif decision == Referee.Decision.FOUL:
 			# ⚠️ FALTA COMUM DA SUA DEFESA (Fora da área — contra VOL, MEI ou ZAG da IA)

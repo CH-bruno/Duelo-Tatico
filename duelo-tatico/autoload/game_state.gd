@@ -11,6 +11,7 @@ enum Possession { PLAYER, AI }
 enum TurnState { PLAYER_ATTACK, PLAYER_DEFENSE }
 enum GameMode { CAMPAIGN, CHALLENGE }
 enum AIMove { PASS, DRIBBLE, LONG_SHOT, SHOT }
+enum PenaltyPhase { NONE, AWAITING_KICK_SIDE, AWAITING_GK_SIDE }
 
 # ---------- 1. ESTADO ----------
 const ZONES = ["Campo Próprio", "Meio-Campo", "Terço Final", "Grande Área"]
@@ -73,6 +74,11 @@ var level: int = 1
 var xp: int = 0
 var pending_xp: int = 0
 var xp_to_next: int = 20
+
+# ---------- 5B. PÊNALTI (escolha de lado) ----------
+var penalty_phase: PenaltyPhase = PenaltyPhase.NONE
+var penalty_is_player_kicker: bool = false
+var penalty_kick_side: String = ""
 
 # ---------- 6. LOGS ----------
 var log_messages: Array = []
@@ -329,7 +335,15 @@ func defend(action: String) -> void:
 	AIOpponent.defend(action)
 
 func _resolve_penalty(is_player_kicker: bool) -> void:
-	PenaltyEngine.execute_penalty(self, is_player_kicker)
+	PenaltyEngine.start_penalty(self, is_player_kicker)
+
+# 🎯 Chamado pelos botões de lado quando VOCÊ é quem cobra o pênalti.
+func choose_penalty_kick_side(side: String) -> void:
+	PenaltyEngine.choose_kick_side(self, side)
+
+# 🧤 Chamado pelos botões de lado quando o SEU goleiro é quem defende.
+func choose_penalty_gk_side(side: String) -> void:
+	PenaltyEngine.choose_gk_side(self, side)
 
 
 # ==============================================================================

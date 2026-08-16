@@ -231,6 +231,30 @@ const PENALTY_CALL = [
 	"🚨 Falta dentro da área! O árbitro não hesita e marca o PÊNALTI!"
 ]
 
+# 🎯 Cobrador anuncia o lado escolhido
+const PENALTY_KICK_ANNOUNCE = [
+	"🎯 %s (%s) escolhe o canto e mira pro lado %s.",
+	"🎯 %s (%s) já decidiu: vai de %s.",
+	"🎯 %s (%s) se prepara, mirando o lado %s.",
+	"🎯 %s (%s) aponta a bola pro lado %s."
+]
+
+# 🧤 Goleiro foi pro lado certo — vira duelo de verdade
+const PENALTY_GK_GUESSED_RIGHT = [
+	"🧤 %s vai pro lado certo!",
+	"🧤 %s leu a cobrança e pulou no canto certo!",
+	"🧤 %s não caiu no truque — foi pro lado certo!",
+	"🧤 %s adivinhou o canto!"
+]
+
+# ↔️ Goleiro foi pro lado errado — cobrador muito favorito
+const PENALTY_GK_GUESSED_WRONG = [
+	"↔️ %s foi pro lado errado!",
+	"↔️ %s caiu no outro canto — caminho livre!",
+	"↔️ %s escorregou pro lado errado!",
+	"↔️ %s se atirou no canto errado!"
+]
+
 # Gol de Pênalti
 const PENALTY_GOAL = [
 	"⚽ GOL DE PÊNALTI! Cobrança perfeita no canto!",

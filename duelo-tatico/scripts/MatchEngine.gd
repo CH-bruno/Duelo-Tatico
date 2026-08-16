@@ -149,7 +149,7 @@ static func _do_dribble(gs: Node) -> void:
 			if gs.match_over:
 				return
 
-			PenaltyEngine.execute_penalty(gs, true)
+			PenaltyEngine.start_penalty(gs, true)
 
 		elif decision == Referee.Decision.FOUL:
 			# ⚠️ FALTA COMUM DA IA: a vantagem fica com quem foi driblado —

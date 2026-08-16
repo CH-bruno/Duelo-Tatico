@@ -22,6 +22,14 @@ var block_button: Button
 var slide_button: Button
 var attack_container: HBoxContainer
 
+# 🚨 Pênalti — criados dinamicamente, mesmo padrão do slide_button
+var penalty_container: VBoxContainer
+var penalty_label: Label
+var penalty_buttons_row: HBoxContainer
+var penalty_left_button: Button
+var penalty_center_button: Button
+var penalty_right_button: Button
+
 # 🛡️ Evita agendar _move_succeeds() mais de uma vez enquanto a chamada
 # adiada da zona desprotegida ainda não rodou.
 var _undefended_zone_pending := false
@@ -45,6 +53,7 @@ func setup(nodes: Dictionary) -> void:
 	attack_container = nodes["attack_container"]
 
 	_setup_slide_button()
+	_setup_penalty_buttons()
 	_setup_ui_styles()
 
 
@@ -59,6 +68,67 @@ func _setup_slide_button() -> void:
 			
 			slide_button.pressed.connect(func(): GameState.defend("SLIDE"))
 			UIUtils.add_press_feedback(slide_button)
+
+
+# 🚨 Monta os 3 botões de lado do pênalti (Esquerda/Centro/Direita), usados
+# tanto pra escolher onde cobrar quanto pra escolher pra onde o goleiro pula.
+# Fica escondido o tempo todo, só aparece quando GameState.penalty_phase != NONE.
+func _setup_penalty_buttons() -> void:
+	if penalty_container:
+		return
+
+	var parent = defense_container.get_parent() if defense_container else attack_container.get_parent()
+	if not parent:
+		return
+
+	penalty_container = VBoxContainer.new()
+	penalty_container.name = "PenaltyContainer"
+	penalty_container.add_theme_constant_override("separation", 6)
+	penalty_container.visible = false
+	parent.add_child(penalty_container)
+
+	penalty_label = Label.new()
+	penalty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	penalty_label.add_theme_color_override("font_color", AppTheme.GOLD)
+	penalty_label.add_theme_font_size_override("font_size", 13)
+	penalty_container.add_child(penalty_label)
+
+	penalty_buttons_row = HBoxContainer.new()
+	penalty_buttons_row.name = "PenaltyButtonsRow"
+	penalty_buttons_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	penalty_buttons_row.add_theme_constant_override("separation", 8)
+	penalty_container.add_child(penalty_buttons_row)
+
+	penalty_left_button = Button.new()
+	penalty_left_button.name = "PenaltyLeftButton"
+	penalty_left_button.text = "◀ Esquerda"
+	penalty_left_button.custom_minimum_size = Vector2(110, 34)
+	penalty_left_button.pressed.connect(func(): _on_penalty_side_pressed("ESQUERDA"))
+	UIUtils.add_press_feedback(penalty_left_button)
+	penalty_buttons_row.add_child(penalty_left_button)
+
+	penalty_center_button = Button.new()
+	penalty_center_button.name = "PenaltyCenterButton"
+	penalty_center_button.text = "▲ Centro"
+	penalty_center_button.custom_minimum_size = Vector2(110, 34)
+	penalty_center_button.pressed.connect(func(): _on_penalty_side_pressed("CENTRO"))
+	UIUtils.add_press_feedback(penalty_center_button)
+	penalty_buttons_row.add_child(penalty_center_button)
+
+	penalty_right_button = Button.new()
+	penalty_right_button.name = "PenaltyRightButton"
+	penalty_right_button.text = "▶ Direita"
+	penalty_right_button.custom_minimum_size = Vector2(110, 34)
+	penalty_right_button.pressed.connect(func(): _on_penalty_side_pressed("DIREITA"))
+	UIUtils.add_press_feedback(penalty_right_button)
+	penalty_buttons_row.add_child(penalty_right_button)
+
+
+func _on_penalty_side_pressed(side: String) -> void:
+	if GameState.penalty_phase == GameState.PenaltyPhase.AWAITING_KICK_SIDE:
+		GameState.choose_penalty_kick_side(side)
+	elif GameState.penalty_phase == GameState.PenaltyPhase.AWAITING_GK_SIDE:
+		GameState.choose_penalty_gk_side(side)
 
 
 func _setup_ui_styles() -> void:
@@ -148,6 +218,7 @@ func refresh() -> void:
 		attack_container.visible = false
 		pass_container.visible = false
 		defense_container.visible = false
+		if penalty_container: penalty_container.visible = false
 		
 		var can_next = (
 			GameState.game_mode == GameState.GameMode.CAMPAIGN
@@ -157,6 +228,28 @@ func refresh() -> void:
 		next_match.visible = can_next
 		_render_logs()
 		return
+
+	# 🚨 PÊNALTI EM ANDAMENTO: esconde os controles normais, mostra só os
+	# 3 botões de lado — tanto pra escolher onde cobrar quanto pra onde
+	# o goleiro pula, dependendo da fase.
+	if GameState.penalty_phase != GameState.PenaltyPhase.NONE:
+		attack_container.visible = false
+		pass_container.visible = false
+		defense_container.visible = false
+		next_match.visible = false
+
+		if penalty_container:
+			penalty_container.visible = true
+			if GameState.penalty_phase == GameState.PenaltyPhase.AWAITING_KICK_SIDE:
+				penalty_label.text = "🎯 Escolha o lado da cobrança:"
+			else:
+				penalty_label.text = "🧤 Pra qual lado seu goleiro pula?"
+
+		_render_logs()
+		return
+
+	if penalty_container:
+		penalty_container.visible = false
 
 	# 3. TURNO E BOTÕES DE DEFESA / ATAQUE
 	var is_defending = GameState.turn_state == GameState.TurnState.PLAYER_DEFENSE
