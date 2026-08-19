@@ -24,6 +24,7 @@ const MatchStatsScene = preload("res://scenes/MatchStats.tscn")
 const SubstitutionDialogScene = preload("res://scenes/SubstitutionDialog.tscn")
 const HalftimeDialogScript = preload("res://scenes/HalftimeDialog.gd")
 const MatchLogDialogScript = preload("res://scripts/MatchLogDialog.gd")
+const PenaltyDialogScript = preload("res://scripts/PenaltyDialog.gd")
 const UIUtils = preload("res://scripts/UIUtils.gd")
 
 var sub_button: Button = null
@@ -165,6 +166,11 @@ func refresh_ui():
 	_last_goals = GameState.goals
 	_last_ai_goals = GameState.ai_goals
 
+	# 🎯 Abre o modal de pênalti assim que uma cobrança começa (normal ou
+	# disputa). O próprio dialog decide quando se fechar sozinho.
+	if (GameState.penalty_phase != GameState.PenaltyPhase.NONE or GameState.in_shootout) and not has_node("PenaltyDialog"):
+		_open_penalty_dialog()
+
 	if GameState.match_over and not stats_opened:
 		stats_opened = true
 		show_match_stats()
@@ -230,6 +236,22 @@ func _open_log_dialog() -> void:
 
 	dialog.closed.connect(func():
 		pass
+	)
+
+
+# 🎯 Abre o modal de pênalti (cobrança normal OU disputa) — mesmo padrão
+# do log/histórico, script anexado direto num Control novo.
+func _open_penalty_dialog() -> void:
+	if has_node("PenaltyDialog"):
+		return
+
+	var dialog = Control.new()
+	dialog.name = "PenaltyDialog"
+	dialog.set_script(PenaltyDialogScript)
+	add_child(dialog)
+
+	dialog.closed.connect(func():
+		refresh_ui()
 	)
 
 

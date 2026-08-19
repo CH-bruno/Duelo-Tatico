@@ -79,6 +79,21 @@ var xp_to_next: int = 20
 var penalty_phase: PenaltyPhase = PenaltyPhase.NONE
 var penalty_is_player_kicker: bool = false
 var penalty_kick_side: String = ""
+# 🎬 Última cobrança resolvida — usado pelo PenaltyDialog pra desenhar a
+# "revelação" (bola indo pro canto, goleiro pulando) antes de fechar.
+var penalty_last_kick_side: String = ""
+var penalty_last_gk_side: String = ""
+var penalty_last_result: String = "" # "" | "GOAL" | "MISS"
+
+# ---------- 5C. DISPUTA DE PÊNALTIS (empate no fim da partida) ----------
+const SHOOTOUT_ORDER_SLOTS = [3, 2, 1, 0] # CA, MEI, VOL, ZAG (índice em starters/opponent_squad)
+
+var in_shootout: bool = false
+var shootout_turn: int = 0
+var shootout_player_score: int = 0
+var shootout_ai_score: int = 0
+var shootout_player_attempts: int = 0
+var shootout_ai_attempts: int = 0
 
 # ---------- 6. LOGS ----------
 var log_messages: Array = []
@@ -352,6 +367,71 @@ func choose_penalty_gk_side(side: String) -> void:
 
 func attempt(action: String, target_idx: int = -1) -> void:
 	MatchEngine.attempt(self, action, target_idx)
+
+
+# ==============================================================================
+# 5C. DISPUTA DE PÊNALTIS
+# ==============================================================================
+
+func start_shootout() -> void:
+	in_shootout = true
+	shootout_turn = 0
+	shootout_player_score = 0
+	shootout_ai_score = 0
+	shootout_player_attempts = 0
+	shootout_ai_attempts = 0
+	PenaltyEngine.start_shootout_kick(self)
+
+func shootout_kicker_is_player() -> bool:
+	return shootout_turn % 2 == 0
+
+func shootout_current_slot() -> int:
+	var round_idx = int(shootout_turn / 2.0)
+	return SHOOTOUT_ORDER_SLOTS[round_idx % SHOOTOUT_ORDER_SLOTS.size()]
+
+func shootout_kicker_dict() -> Dictionary:
+	var slot = shootout_current_slot()
+	if shootout_kicker_is_player():
+		return squad[slot] if slot < squad.size() else {}
+	else:
+		return opponent_squad[slot] if slot < opponent_squad.size() else {}
+
+func shootout_record_result(is_player_kicker: bool, scored: bool) -> void:
+	if is_player_kicker:
+		shootout_player_attempts += 1
+		if scored: shootout_player_score += 1
+	else:
+		shootout_ai_attempts += 1
+		if scored: shootout_ai_score += 1
+
+# Depois de 5 cobranças de cada, decide quem tiver mais gols. Empatado,
+# continua em morte súbita (1 cobrança por vez, alternando).
+func shootout_is_decided() -> bool:
+	if shootout_player_attempts >= 5 and shootout_ai_attempts >= 5 and shootout_player_attempts == shootout_ai_attempts:
+		return shootout_player_score != shootout_ai_score
+	return false
+
+func shootout_advance_or_finish() -> void:
+	if shootout_is_decided():
+		_finish_shootout()
+	else:
+		shootout_turn += 1
+		PenaltyEngine.start_shootout_kick(self)
+
+func _finish_shootout() -> void:
+	in_shootout = false
+	match_over = true
+
+	if shootout_player_score > shootout_ai_score:
+		goals = max(goals, ai_goals) + 1
+		push_log("🏆 Vitória nos pênaltis! %d × %d (disputa: %d × %d)." % [goals, ai_goals, shootout_player_score, shootout_ai_score])
+	else:
+		ai_goals = max(goals, ai_goals) + 1
+		push_log("💔 Derrota nos pênaltis! %d × %d (disputa: %d × %d)." % [goals, ai_goals, shootout_player_score, shootout_ai_score])
+
+	SFX.play_whistle()
+	Progression.process_pending_xp(self)
+	state_changed.emit()
 
 
 # ==============================================================================

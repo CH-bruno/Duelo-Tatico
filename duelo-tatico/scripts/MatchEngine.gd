@@ -429,6 +429,17 @@ static func advance_round(gs: Node) -> void:
 
 	if gs.round_num >= gs.MAX_ROUNDS:
 		gs.round_num = gs.MAX_ROUNDS
+
+		# ⚽🆚⚽ Empate no apito final -> disputa de pênaltis, em vez de só
+		# terminar empatado. match_over só vira true quando a disputa acabar
+		# (GameState._finish_shootout()), então a tela de estatísticas não
+		# abre no meio da disputa.
+		if gs.goals == gs.ai_goals:
+			gs.push_log("🔔 Fim de jogo! Empate em %d × %d — vai pra disputa de pênaltis!" % [gs.goals, gs.ai_goals])
+			SFX.play_whistle()
+			gs.start_shootout()
+			return
+
 		gs.match_over = true
 		SFX.play_whistle()
 		
@@ -443,9 +454,7 @@ static func advance_round(gs: Node) -> void:
 					gs.push_log("Clique em 'Próxima Partida' para continuar a campanha.")
 			else:
 				gs.push_log("Clique em 'Próximo Desafio' para avançar.")
-		elif gs.goals < gs.ai_goals:
-			gs.push_log("Derrota por %d × %d." % [gs.goals, gs.ai_goals])
 		else:
-			gs.push_log("Empate em %d × %d." % [gs.goals, gs.ai_goals])
+			gs.push_log("Derrota por %d × %d." % [gs.goals, gs.ai_goals])
 			
 		gs.state_changed.emit()
